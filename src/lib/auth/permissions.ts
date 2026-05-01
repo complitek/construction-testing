@@ -1,6 +1,6 @@
 import type { Role } from '@/lib/types'
 
-type Permission =
+export type Permission =
   | 'create_pour_log'
   | 'upload_combined_pdf'
   | 'confirm_ticket_match'
@@ -9,6 +9,11 @@ type Permission =
   | 'download_report'
   | 'bulk_download'
   | 'manage_users'
+
+export const VALID_ROLES: Role[] = [
+  'lab_tech', 'lab_manager', 'office_manager', 'field_tech',
+  'concrete_qc_manager', 'qc_manager', 'alt_qc_manager',
+]
 
 const PERMISSIONS: Record<Permission, Role[]> = {
   create_pour_log: ['lab_tech', 'lab_manager', 'office_manager', 'field_tech'],

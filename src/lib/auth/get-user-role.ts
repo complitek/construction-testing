@@ -1,11 +1,13 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { currentUser } from '@clerk/nextjs/server'
 import type { Role } from '@/lib/types'
+import { VALID_ROLES } from '@/lib/auth/permissions'
 
 export async function getUserRole(): Promise<Role | null> {
-  const { userId } = await auth()
-  if (!userId) return null
   const user = await currentUser()
-  return (user?.publicMetadata?.role as Role) ?? null
+  if (!user) return null
+  const raw = user.publicMetadata?.role
+  if (!raw || !VALID_ROLES.includes(raw as Role)) return null
+  return raw as Role
 }
 
 export async function requireRole(): Promise<Role> {
