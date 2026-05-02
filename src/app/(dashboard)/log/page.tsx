@@ -17,6 +17,8 @@ export default function MasterLogPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'date' | 'mixId'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     fetch('/api/log').then(r => r.json()).then((data: LogRow[]) => {
@@ -25,6 +27,21 @@ export default function MasterLogPage() {
     })
     fetch('/api/log/upload').then(r => r.json()).then(d => setUploadedUrl(d.url)).catch(() => {})
   }, [])
+
+  function toggleSort(field: 'date' | 'mixId') {
+    if (sortBy === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[sortBy] ?? ''
+    const bv = b[sortBy] ?? ''
+    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+  })
 
   async function uploadMasterLog() {
     if (!uploadFile) return
@@ -99,12 +116,22 @@ export default function MasterLogPage() {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-gray-800 text-white">
-                <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
+                <th
+                  className="px-3 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:bg-gray-700"
+                  onClick={() => toggleSort('date')}
+                >
+                  Date {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                </th>
                 <th className="px-3 py-2 text-left whitespace-nowrap">Shift</th>
                 <th className="px-3 py-2 text-left whitespace-nowrap">Spec</th>
                 <th className="px-3 py-2 text-left whitespace-nowrap">Location</th>
                 <th className="px-3 py-2 text-left whitespace-nowrap">Supplier</th>
-                <th className="px-3 py-2 text-left whitespace-nowrap">Mix ID</th>
+                <th
+                  className="px-3 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:bg-gray-700"
+                  onClick={() => toggleSort('mixId')}
+                >
+                  Mix ID {sortBy === 'mixId' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                </th>
                 <th className="px-3 py-2 text-left whitespace-nowrap">Ticket #</th>
                 {BREAK_AGES.map(age => (
                   <th key={age} className="px-3 py-2 text-center whitespace-nowrap">{AGE_LABEL[age]}</th>
@@ -114,7 +141,7 @@ export default function MasterLogPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {sorted.map((row, i) => (
                 <tr key={row.sampleId} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="px-3 py-2 border-b whitespace-nowrap font-medium">{row.date}</td>
                   <td className="px-3 py-2 border-b capitalize whitespace-nowrap">{row.shift}</td>

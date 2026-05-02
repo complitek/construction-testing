@@ -5,10 +5,27 @@ import type { PourEvent } from '@/lib/types'
 
 export default function PourListPage() {
   const [pours, setPours] = useState<PourEvent[]>([])
+  const [sortBy, setSortBy] = useState<'date' | 'mixId'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     fetch('/api/pours').then(r => r.json()).then(setPours)
   }, [])
+
+  function toggleSort(field: 'date' | 'mixId') {
+    if (sortBy === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+  }
+
+  const sorted = [...pours].sort((a, b) => {
+    const av = a[sortBy] ?? ''
+    const bv = b[sortBy] ?? ''
+    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+  })
 
   return (
     <div>
@@ -23,16 +40,26 @@ export default function PourListPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="text-left px-4 py-3">Date</th>
+              <th
+                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-gray-100"
+                onClick={() => toggleSort('date')}
+              >
+                Date {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+              </th>
               <th className="text-left px-4 py-3">Shift</th>
               <th className="text-left px-4 py-3">Location</th>
               <th className="text-left px-4 py-3">Supplier</th>
-              <th className="text-left px-4 py-3">Mix ID</th>
+              <th
+                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-gray-100"
+                onClick={() => toggleSort('mixId')}
+              >
+                Mix ID {sortBy === 'mixId' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+              </th>
               <th className="text-left px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
-            {pours.map(pour => (
+            {sorted.map(pour => (
               <tr key={pour.id} className="border-b hover:bg-gray-50">
                 <td className="px-4 py-3">{pour.date}</td>
                 <td className="px-4 py-3 capitalize">{pour.shift}</td>
