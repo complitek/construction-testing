@@ -8,6 +8,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex items-center gap-6">
           <Link href="/" className="font-bold text-lg text-blue-700">Concrete Reports</Link>
           <Link href="/pours" className="text-sm text-gray-600 hover:text-gray-900">Pour Log</Link>
+          <Link href="/log" className="text-sm text-gray-600 hover:text-gray-900">Master Log</Link>
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">Admin</Link>
         </div>
         <UserButton />
