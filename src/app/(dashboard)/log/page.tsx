@@ -5,6 +5,7 @@ import type { BreakAge } from '@/lib/types'
 import { BREAK_AGES } from '@/lib/types'
 import type { LogRow } from '@/app/api/log/route'
 
+
 const AGE_LABEL: Record<BreakAge, string> = {
   '1day': '1d', '3day': '3d', '4day': '4d', '5day': '5d', '7day': '7d',
   '14day': '14d', '28day': '28d', '56day': '56d', '90day': '90d', '120day': '120d',
@@ -13,13 +14,28 @@ const AGE_LABEL: Record<BreakAge, string> = {
 export default function MasterLogPage() {
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/log').then(r => r.json()).then((data: LogRow[]) => {
       setRows(data)
       setLoading(false)
     })
+    fetch('/api/log/upload').then(r => r.json()).then(d => setUploadedUrl(d.url)).catch(() => {})
   }, [])
+
+  async function uploadMasterLog() {
+    if (!uploadFile) return
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('file', uploadFile)
+    const res = await fetch('/api/log/upload', { method: 'POST', body: fd })
+    const data = await res.json()
+    setUploadedUrl(data.url)
+    setUploading(false)
+  }
 
   if (loading) return <p className="text-gray-400">Loading...</p>
 
@@ -28,6 +44,52 @@ export default function MasterLogPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Master Concrete Log</h1>
         <span className="text-sm text-gray-500">{rows.length} sample sets</span>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-6 mb-6">
+        {/* Upload existing master log */}
+        <div className="bg-white border rounded-lg p-4 flex-1">
+          <h2 className="font-semibold text-sm mb-2">Upload Existing Master Log</h2>
+          {uploadedUrl && (
+            <p className="text-xs text-green-700 mb-2">
+              File on record. <a href={uploadedUrl} className="underline" target="_blank" rel="noreferrer">View</a>
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept=".xlsx"
+              onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
+              className="text-xs flex-1"
+            />
+            <button
+              onClick={uploadMasterLog}
+              disabled={!uploadFile || uploading}
+              className="bg-gray-700 text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800 disabled:opacity-50 whitespace-nowrap"
+            >
+              {uploading ? 'Uploading...' : 'Upload'}
+            </button>
+          </div>
+        </div>
+
+        {/* Download current data */}
+        <div className="bg-white border rounded-lg p-4 flex-1">
+          <h2 className="font-semibold text-sm mb-2">Download Current Master Log</h2>
+          <div className="flex gap-2">
+            <a
+              href="/api/log/download?format=xlsx"
+              className="bg-green-600 text-white px-3 py-1.5 rounded text-xs hover:bg-green-700"
+            >
+              Download Excel
+            </a>
+            <a
+              href="/api/log/download?format=pdf"
+              className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs hover:bg-gray-900"
+            >
+              Download PDF
+            </a>
+          </div>
+        </div>
       </div>
 
       {rows.length === 0 ? (

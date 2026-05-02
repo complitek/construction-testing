@@ -22,6 +22,11 @@ export interface LogRow {
   matchStatus: string
   reportStatus: string
   ticketFileUrl: string | null
+  // Field tests
+  temperature?: number | null
+  slump?: string | null
+  unitWeight?: number | null
+  airContent?: number | null
   // Break results
   breaks: Partial<Record<BreakAge, number>>
 }
@@ -62,6 +67,10 @@ export async function GET() {
         matchStatus: s.matchStatus,
         reportStatus: s.reportStatus,
         ticketFileUrl: s.ticketFileUrl,
+        temperature: s.temperature,
+        slump: s.slump,
+        unitWeight: s.unitWeight,
+        airContent: s.airContent,
         breaks,
       })
     }
