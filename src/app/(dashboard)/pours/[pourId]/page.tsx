@@ -13,10 +13,17 @@ export default function PourDetailPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<string | null>(null)
+  const [tickets, setTickets] = useState<Array<{
+    id: string; batchTicketNumber: string | null; fileUrl: string; pageStart: number; pageEnd: number
+  }>>([])
+  const [attachFile, setAttachFile] = useState<File | null>(null)
+  const [attachTicketNumber, setAttachTicketNumber] = useState('')
+  const [attaching, setAttaching] = useState(false)
 
   useEffect(() => {
     fetch(`/api/pours/${pourId}`).then(r => r.json()).then(setPour)
     fetch(`/api/samples?pourId=${pourId}`).then(r => r.json()).then(setSamples)
+    fetch(`/api/tickets?pourId=${pourId}`).then(r => r.json()).then(setTickets)
   }, [pourId])
 
   async function addSampleSet() {
@@ -43,7 +50,23 @@ export default function PourDetailPage() {
     const result = await res.json()
     setUploadResult(`Processed ${result.totalTickets} tickets — ${result.autoMatched} auto-matched, ${result.flagged} flagged, ${result.unmatched} unmatched`)
     fetch(`/api/samples?pourId=${pourId}`).then(r => r.json()).then(setSamples)
+    fetch(`/api/tickets?pourId=${pourId}`).then(r => r.json()).then(setTickets)
     setUploading(false)
+  }
+
+  async function attachTicket() {
+    if (!attachFile) return
+    setAttaching(true)
+    const fd = new FormData()
+    fd.append('file', attachFile)
+    fd.append('pourId', pourId)
+    if (attachTicketNumber) fd.append('ticketNumber', attachTicketNumber)
+    const res = await fetch('/api/tickets/attach', { method: 'POST', body: fd })
+    const record = await res.json()
+    setTickets(t => [...t, record])
+    setAttachFile(null)
+    setAttachTicketNumber('')
+    setAttaching(false)
   }
 
   if (!pour) return <p className="text-gray-400">Loading...</p>
@@ -115,6 +138,68 @@ export default function PourDetailPage() {
             {uploading ? 'Processing...' : 'Upload & Process'}
           </button>
           {uploadResult && <p className="mt-3 text-sm text-green-700">{uploadResult}</p>}
+        </div>
+      </section>
+
+      {/* Batch Ticket Attachments */}
+      <section className="mb-8">
+        <h2 className="font-bold text-lg mb-3">Batch Ticket Attachments</h2>
+
+        {tickets.length > 0 && (
+          <div className="bg-white border rounded-lg overflow-hidden mb-3">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-2">Ticket #</th>
+                  <th className="text-left px-4 py-2">Pages</th>
+                  <th className="text-left px-4 py-2">File</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map(t => (
+                  <tr key={t.id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-2">{t.batchTicketNumber ?? '—'}</td>
+                    <td className="px-4 py-2 text-gray-500 text-xs">
+                      {t.pageStart === t.pageEnd ? `p.${t.pageStart + 1}` : `p.${t.pageStart + 1}–${t.pageEnd + 1}`}
+                    </td>
+                    <td className="px-4 py-2">
+                      <a href={t.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
+                        View
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="bg-gray-50 border rounded-lg p-4">
+          <p className="text-xs text-gray-500 mb-3">Attach an individual ticket image or PDF directly (no AI processing)</p>
+          <div className="flex flex-col gap-2">
+            <input
+              type="text"
+              placeholder="Ticket number (optional)"
+              value={attachTicketNumber}
+              onChange={e => setAttachTicketNumber(e.target.value)}
+              className="border rounded px-3 py-1.5 text-sm w-48"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={e => setAttachFile(e.target.files?.[0] ?? null)}
+                className="text-sm"
+              />
+              <button
+                onClick={attachTicket}
+                disabled={!attachFile || attaching}
+                className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {attaching ? 'Attaching...' : 'Attach Ticket'}
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
