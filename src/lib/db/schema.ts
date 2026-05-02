@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, text, integer, timestamp, date
+  pgTable, pgEnum, text, integer, real, timestamp, date
 } from 'drizzle-orm/pg-core'
 
 export const roleEnum = pgEnum('role', [
@@ -57,6 +57,10 @@ export const sampleSets = pgTable('sample_sets', {
   break90day: integer('break_90day'),
   break120day: integer('break_120day'),
   reportStatus: reportStatusEnum('report_status').default('pending_breaks').notNull(),
+  temperature: integer('temperature'),
+  slump: text('slump'),
+  unitWeight: real('unit_weight'),
+  airContent: real('air_content'),
   createdBy: text('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

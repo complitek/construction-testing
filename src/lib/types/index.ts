@@ -55,6 +55,10 @@ export interface SampleSet {
   matchStatus: MatchStatus
   breaks: BreakResults
   reportStatus: ReportStatus
+  temperature: number | null
+  slump: string | null
+  unitWeight: number | null
+  airContent: number | null
   createdBy: string
   createdAt: string
   updatedAt: string

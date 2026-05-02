@@ -77,6 +77,40 @@ function ReportDocument({ pourEvent, sampleSet }: ReportProps) {
           <Text style={styles.fieldValue}>{sampleSet.batchTicketNumber}</Text>
         </View>
 
+        {(sampleSet.temperature != null || sampleSet.slump != null || sampleSet.unitWeight != null || sampleSet.airContent != null) && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Field Test Results:</Text>
+              <Text style={styles.fieldValue}> </Text>
+            </View>
+            {sampleSet.temperature != null && (
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Temperature:</Text>
+                <Text style={styles.fieldValue}>{sampleSet.temperature}°F</Text>
+              </View>
+            )}
+            {sampleSet.slump != null && (
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Slump / Spread:</Text>
+                <Text style={styles.fieldValue}>{sampleSet.slump} in</Text>
+              </View>
+            )}
+            {sampleSet.unitWeight != null && (
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Unit Weight:</Text>
+                <Text style={styles.fieldValue}>{sampleSet.unitWeight} pcf</Text>
+              </View>
+            )}
+            {sampleSet.airContent != null && (
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Air Content:</Text>
+                <Text style={styles.fieldValue}>{sampleSet.airContent}%</Text>
+              </View>
+            )}
+          </>
+        )}
+
         <View style={styles.divider} />
 
         <View style={styles.tableHeader}>

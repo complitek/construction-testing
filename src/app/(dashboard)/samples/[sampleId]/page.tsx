@@ -18,6 +18,11 @@ export default function SampleDetailPage() {
   const [breaks, setBreaks] = useState<Partial<Record<BreakAge, string>>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [fieldTests, setFieldTests] = useState({
+    temperature: '', slump: '', unitWeight: '', airContent: '',
+  })
+  const [savingFields, setSavingFields] = useState(false)
+  const [fieldsSaved, setFieldsSaved] = useState(false)
 
   useEffect(() => {
     fetch(`/api/samples/${sampleId}`).then(r => r.json()).then((s: SampleSet) => {
@@ -27,9 +32,32 @@ export default function SampleDetailPage() {
         if (s.breaks[age] != null) init[age] = String(s.breaks[age])
       }
       setBreaks(init)
+      setFieldTests({
+        temperature: s.temperature != null ? String(s.temperature) : '',
+        slump: s.slump ?? '',
+        unitWeight: s.unitWeight != null ? String(s.unitWeight) : '',
+        airContent: s.airContent != null ? String(s.airContent) : '',
+      })
       fetch(`/api/pours/${s.pourEventId}`).then(r => r.json()).then(setPour)
     })
   }, [sampleId])
+
+  async function saveFieldTests() {
+    setSavingFields(true)
+    await fetch(`/api/samples/${sampleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        temperature: fieldTests.temperature ? Number(fieldTests.temperature) : null,
+        slump: fieldTests.slump || null,
+        unitWeight: fieldTests.unitWeight ? Number(fieldTests.unitWeight) : null,
+        airContent: fieldTests.airContent ? Number(fieldTests.airContent) : null,
+      }),
+    })
+    setSavingFields(false)
+    setFieldsSaved(true)
+    setTimeout(() => setFieldsSaved(false), 2000)
+  }
 
   async function saveBreaks() {
     setSaving(true)
@@ -58,6 +86,61 @@ export default function SampleDetailPage() {
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold mb-1">Batch Ticket #{sample.batchTicketNumber}</h1>
       <p className="text-gray-500 text-sm mb-6">{pour.date} — {pour.location}</p>
+
+      <div className="bg-white border rounded-lg p-4 mb-6">
+        <h2 className="font-bold text-sm mb-3 text-gray-700 uppercase tracking-wide">Field Test Results</h2>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Temperature (°F)</label>
+            <input
+              type="number"
+              placeholder="—"
+              value={fieldTests.temperature}
+              onChange={e => setFieldTests(f => ({ ...f, temperature: e.target.value }))}
+              className="border rounded px-2 py-1.5 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Slump / Spread (in)</label>
+            <input
+              type="text"
+              placeholder="—"
+              value={fieldTests.slump}
+              onChange={e => setFieldTests(f => ({ ...f, slump: e.target.value }))}
+              className="border rounded px-2 py-1.5 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Unit Weight (pcf)</label>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="—"
+              value={fieldTests.unitWeight}
+              onChange={e => setFieldTests(f => ({ ...f, unitWeight: e.target.value }))}
+              className="border rounded px-2 py-1.5 text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Air Content (%)</label>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="—"
+              value={fieldTests.airContent}
+              onChange={e => setFieldTests(f => ({ ...f, airContent: e.target.value }))}
+              className="border rounded px-2 py-1.5 text-sm w-full"
+            />
+          </div>
+        </div>
+        <button
+          onClick={saveFieldTests}
+          disabled={savingFields}
+          className="bg-gray-700 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 disabled:opacity-50"
+        >
+          {savingFields ? 'Saving...' : fieldsSaved ? 'Saved!' : 'Save Field Tests'}
+        </button>
+      </div>
 
       <div className="bg-white border rounded-lg overflow-hidden mb-6">
         <table className="w-full text-sm">

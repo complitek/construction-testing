@@ -25,7 +25,12 @@ function toSampleSet(row: typeof sampleSets.$inferSelect): SampleSet {
   return {
     id: row.id, pourEventId: row.pourEventId, batchTicketNumber: row.batchTicketNumber,
     ticketFileUrl: row.ticketFileUrl, matchStatus: row.matchStatus, breaks,
-    reportStatus: row.reportStatus, createdBy: row.createdBy,
+    reportStatus: row.reportStatus,
+    temperature: row.temperature ?? null,
+    slump: row.slump ?? null,
+    unitWeight: row.unitWeight ?? null,
+    airContent: row.airContent ?? null,
+    createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
   }
 }
