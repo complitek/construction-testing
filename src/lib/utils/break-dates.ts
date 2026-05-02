@@ -6,8 +6,7 @@ const BREAK_AGE_DAYS: Record<BreakAge, number> = {
 }
 
 export function calculateBreakDate(placementDate: string, age: BreakAge): string {
-  const [year, month, day] = placementDate.split('-').map(Number)
-  const date = new Date(Date.UTC(year, month - 1, day))
+  const date = new Date(placementDate + 'T00:00:00Z')
   date.setUTCDate(date.getUTCDate() + BREAK_AGE_DAYS[age])
   return date.toISOString().split('T')[0]
 }

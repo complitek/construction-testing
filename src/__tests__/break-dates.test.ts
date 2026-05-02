@@ -14,6 +14,15 @@ describe('calculateBreakDate', () => {
   it('handles month boundary', () => {
     expect(calculateBreakDate('2026-05-30', '7day')).toBe('2026-06-06')
   })
+  it('handles year boundary', () => {
+    expect(calculateBreakDate('2025-12-28', '7day')).toBe('2026-01-04')
+  })
+  it('handles leap year', () => {
+    expect(calculateBreakDate('2024-02-27', '3day')).toBe('2024-03-01')
+  })
+  it('handles 120-day break age', () => {
+    expect(calculateBreakDate('2026-05-01', '120day')).toBe('2026-08-29')
+  })
 })
 
 describe('calculateAllBreakDates', () => {
