@@ -19,6 +19,10 @@ export async function POST(request: Request) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'file required' }, { status: 400 })
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN === 'vercel_blob_replace_me') {
+    return NextResponse.json({ error: 'File storage is not configured yet. Set up Vercel Blob to enable uploads.' }, { status: 503 })
+  }
+
   const bytes = Buffer.from(await file.arrayBuffer())
   const blob = await put(`master-log/${Date.now()}-${file.name}`, bytes, {
     access: 'public',

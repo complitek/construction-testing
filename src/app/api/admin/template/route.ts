@@ -19,6 +19,10 @@ export async function POST(request: Request) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'file required' }, { status: 400 })
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN === 'vercel_blob_replace_me') {
+    return NextResponse.json({ error: 'File storage is not configured yet.' }, { status: 503 })
+  }
+
   const blob = await put('templates/compression-report.xlsx', file, {
     access: 'public',
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

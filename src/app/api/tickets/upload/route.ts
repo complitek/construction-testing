@@ -29,6 +29,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'file and pourId required' }, { status: 400 })
   }
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN === 'vercel_blob_replace_me') {
+    return NextResponse.json({ error: 'File storage is not configured yet.' }, { status: 503 })
+  }
+
   const pdfBytes = Buffer.from(await file.arrayBuffer())
 
   const originalBlob = await put(`tickets/combined/${pourId}-${Date.now()}.pdf`, pdfBytes, {

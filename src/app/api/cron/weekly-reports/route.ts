@@ -45,6 +45,10 @@ export async function GET(request: Request) {
   let skipped = 0
   const errors: string[] = []
 
+  if (!process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN === 'vercel_blob_replace_me') {
+    return NextResponse.json({ error: 'File storage is not configured yet.' }, { status: 503 })
+  }
+
   for (const sampleRow of allSamples) {
     try {
       const [pourRow] = await db.select().from(pourEvents)
