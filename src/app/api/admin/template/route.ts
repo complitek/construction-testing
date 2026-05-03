@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = await getUserRole()
-  if (!role || !hasPermission(role, 'manage_users')) {
+  if (!role || !hasPermission(role, 'manage_templates')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -34,6 +34,10 @@ export async function POST(request: Request) {
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const role = await getUserRole()
+  if (!role || !hasPermission(role, 'manage_templates')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, 'excel_template_url'))
   return NextResponse.json({ url: setting?.value ?? null })

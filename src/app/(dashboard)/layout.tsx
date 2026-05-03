@@ -12,6 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/welding" className="text-sm text-gray-600 hover:text-gray-900">Welding</Link>
           <Link href="/structural" className="text-sm text-gray-600 hover:text-gray-900">Structural</Link>
           <Link href="/logs" className="text-sm text-gray-600 hover:text-gray-900">Logs</Link>
+          <Link href="/templates" className="text-sm text-gray-600 hover:text-gray-900">Templates</Link>
           <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">Admin</Link>
         </div>
         <UserButton />

@@ -9,6 +9,7 @@ export type Permission =
   | 'download_report'
   | 'bulk_download'
   | 'manage_users'
+  | 'manage_templates'
 
 export const VALID_ROLES: Role[] = [
   'lab_tech', 'lab_manager', 'office_manager', 'field_tech',
@@ -26,6 +27,7 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   bulk_download: ['lab_tech', 'lab_manager', 'office_manager', 'field_tech',
     'concrete_qc_manager', 'qc_manager', 'alt_qc_manager'],
   manage_users: ['lab_manager'],
+  manage_templates: ['lab_manager', 'qc_manager', 'alt_qc_manager', 'office_manager'],
 }
 
 export function hasPermission(role: Role, permission: Permission): boolean {
