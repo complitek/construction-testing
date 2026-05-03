@@ -31,6 +31,7 @@ function dbRowToSampleSet(row: typeof sampleSets.$inferSelect): SampleSet {
     matchStatus: row.matchStatus,
     breaks,
     reportStatus: row.reportStatus,
+    reportFileUrl: row.reportFileUrl ?? null,
     temperature: row.temperature ?? null,
     slump: row.slump ?? null,
     unitWeight: row.unitWeight ?? null,

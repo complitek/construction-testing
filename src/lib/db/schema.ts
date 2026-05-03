@@ -58,6 +58,7 @@ export const sampleSets = pgTable('sample_sets', {
   break90day: integer('break_90day'),
   break120day: integer('break_120day'),
   reportStatus: reportStatusEnum('report_status').default('pending_breaks').notNull(),
+  reportFileUrl: text('report_file_url'),
   temperature: integer('temperature'),
   slump: text('slump'),
   unitWeight: real('unit_weight'),

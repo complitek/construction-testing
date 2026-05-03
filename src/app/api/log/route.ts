@@ -21,6 +21,7 @@ export interface LogRow {
   batchTicketNumber: string
   matchStatus: string
   reportStatus: string
+  reportFileUrl: string | null
   ticketFileUrl: string | null
   // Field tests
   temperature?: number | null
@@ -66,6 +67,7 @@ export async function GET() {
         batchTicketNumber: s.batchTicketNumber,
         matchStatus: s.matchStatus,
         reportStatus: s.reportStatus,
+        reportFileUrl: s.reportFileUrl ?? null,
         ticketFileUrl: s.ticketFileUrl,
         temperature: s.temperature,
         slump: s.slump,

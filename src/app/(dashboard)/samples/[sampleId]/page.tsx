@@ -197,7 +197,7 @@ export default function SampleDetailPage() {
 
           {sample.reportStatus !== 'pending_breaks' && (
             <a
-              href={`/api/samples/${sampleId}/report`}
+              href={sample.reportFileUrl ?? `/api/samples/${sampleId}/report`}
               className="bg-gray-800 text-white px-4 py-2 rounded text-sm hover:bg-gray-900"
             >
               Download Report PDF
