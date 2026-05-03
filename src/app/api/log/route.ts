@@ -46,7 +46,7 @@ export async function GET() {
       const ageMap: Record<BreakAge, number | null> = {
         '1day': s.break1day, '3day': s.break3day, '4day': s.break4day,
         '5day': s.break5day, '7day': s.break7day, '14day': s.break14day,
-        '28day': s.break28day, '56day': s.break56day, '90day': s.break90day,
+        '21day': s.break21day, '28day': s.break28day, '56day': s.break56day, '90day': s.break90day,
         '120day': s.break120day,
       }
       for (const age of BREAK_AGES) {

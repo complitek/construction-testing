@@ -8,7 +8,7 @@ import type { LogRow } from '@/app/api/log/route'
 
 const AGE_LABEL: Record<BreakAge, string> = {
   '1day': '1d', '3day': '3d', '4day': '4d', '5day': '5d', '7day': '7d',
-  '14day': '14d', '28day': '28d', '56day': '56d', '90day': '90d', '120day': '120d',
+  '14day': '14d', '21day': '21d', '28day': '28d', '56day': '56d', '90day': '90d', '120day': '120d',
 }
 
 export default function MasterLogPage() {

@@ -26,9 +26,9 @@ describe('calculateBreakDate', () => {
 })
 
 describe('calculateAllBreakDates', () => {
-  it('returns a date for all 10 break ages', () => {
+  it('returns a date for all 11 break ages', () => {
     const result = calculateAllBreakDates('2026-05-01')
-    expect(Object.keys(result)).toHaveLength(10)
+    expect(Object.keys(result)).toHaveLength(11)
     expect(result['28day']).toBe('2026-05-29')
   })
 })

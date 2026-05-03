@@ -17,7 +17,7 @@ function dbRowToSampleSet(row: typeof sampleSets.$inferSelect): SampleSet {
   const ageMap: Record<BreakAge, number | null> = {
     '1day': row.break1day, '3day': row.break3day, '4day': row.break4day,
     '5day': row.break5day, '7day': row.break7day, '14day': row.break14day,
-    '28day': row.break28day, '56day': row.break56day, '90day': row.break90day,
+    '21day': row.break21day, '28day': row.break28day, '56day': row.break56day, '90day': row.break90day,
     '120day': row.break120day,
   }
   for (const age of BREAK_AGES) {

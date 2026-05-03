@@ -24,13 +24,13 @@ export type ProcessingStatus = 'pending' | 'processing' | 'complete' | 'failed'
 
 export type BreakAge =
   | '1day' | '3day' | '4day' | '5day' | '7day'
-  | '14day' | '28day' | '56day' | '90day' | '120day'
+  | '14day' | '21day' | '28day' | '56day' | '90day' | '120day'
 
 export type BreakResults = Partial<Record<BreakAge, number>>
 
 export const BREAK_AGES: BreakAge[] = [
   '1day', '3day', '4day', '5day', '7day',
-  '14day', '28day', '56day', '90day', '120day',
+  '14day', '21day', '28day', '56day', '90day', '120day',
 ]
 
 export interface PourEvent {

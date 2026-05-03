@@ -10,7 +10,7 @@ import type { BreakAge } from '@/lib/types'
 const BREAK_COLUMN_MAP: Record<BreakAge, string> = {
   '1day': 'break1day', '3day': 'break3day', '4day': 'break4day',
   '5day': 'break5day', '7day': 'break7day', '14day': 'break14day',
-  '28day': 'break28day', '56day': 'break56day', '90day': 'break90day',
+  '21day': 'break21day', '28day': 'break28day', '56day': 'break56day', '90day': 'break90day',
   '120day': 'break120day',
 }
 

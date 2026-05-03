@@ -7,7 +7,7 @@ import { calculateAllBreakDates } from '@/lib/utils/break-dates'
 
 const AGE_LABEL: Record<BreakAge, string> = {
   '1day': '1-Day', '3day': '3-Day', '4day': '4-Day', '5day': '5-Day',
-  '7day': '7-Day', '14day': '14-Day', '28day': '28-Day',
+  '7day': '7-Day', '14day': '14-Day', '21day': '21-Day', '28day': '28-Day',
   '56day': '56-Day', '90day': '90-Day', '120day': '120-Day',
 }
 

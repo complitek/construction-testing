@@ -52,6 +52,7 @@ export const sampleSets = pgTable('sample_sets', {
   break5day: integer('break_5day'),
   break7day: integer('break_7day'),
   break14day: integer('break_14day'),
+  break21day: integer('break_21day'),
   break28day: integer('break_28day'),
   break56day: integer('break_56day'),
   break90day: integer('break_90day'),

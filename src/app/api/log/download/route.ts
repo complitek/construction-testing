@@ -10,7 +10,7 @@ export const maxDuration = 60
 
 const AGE_LABEL: Record<BreakAge, string> = {
   '1day': '1d', '3day': '3d', '4day': '4d', '5day': '5d', '7day': '7d',
-  '14day': '14d', '28day': '28d', '56day': '56d', '90day': '90d', '120day': '120d',
+  '14day': '14d', '21day': '21d', '28day': '28d', '56day': '56d', '90day': '90d', '120day': '120d',
 }
 
 async function getLogRows() {
@@ -23,7 +23,7 @@ async function getLogRows() {
       const ageMap: Record<BreakAge, number | null> = {
         '1day': s.break1day, '3day': s.break3day, '4day': s.break4day,
         '5day': s.break5day, '7day': s.break7day, '14day': s.break14day,
-        '28day': s.break28day, '56day': s.break56day, '90day': s.break90day,
+        '21day': s.break21day, '28day': s.break28day, '56day': s.break56day, '90day': s.break90day,
         '120day': s.break120day,
       }
       for (const age of BREAK_AGES) {
