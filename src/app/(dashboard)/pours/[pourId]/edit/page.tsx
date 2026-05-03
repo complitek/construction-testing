@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { PourEvent } from '@/lib/types'
 
 export default function EditPourPage() {
@@ -26,6 +27,17 @@ export default function EditPourPage() {
 
   return (
     <div className="max-w-2xl">
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-6 flex-wrap">
+        <Link href="/" className="hover:text-blue-600">Construction Testing</Link>
+        <span>›</span>
+        <Link href="/concrete" className="hover:text-blue-600">Concrete</Link>
+        <span>›</span>
+        <Link href="/pours" className="hover:text-blue-600">Pour Log</Link>
+        <span>›</span>
+        <Link href={`/pours/${pourId}`} className="hover:text-blue-600">{form.date ?? '...'}</Link>
+        <span>›</span>
+        <span className="text-gray-900 font-medium">Edit</span>
+      </div>
       <h1 className="text-2xl font-bold mb-6">Edit Pour Event</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         {(['date', 'spec', 'location', 'description', 'supplier', 'mixId'] as const).map(key => (

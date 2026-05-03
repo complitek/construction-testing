@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { AppUser, Role } from '@/lib/types'
 
 const ROLES: Role[] = [
@@ -47,6 +48,11 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-3xl space-y-10">
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 flex-wrap">
+        <Link href="/" className="hover:text-blue-600">Construction Testing</Link>
+        <span>›</span>
+        <span className="text-gray-900 font-medium">Admin</span>
+      </div>
       <section>
         <h1 className="text-2xl font-bold mb-6">Admin</h1>
 

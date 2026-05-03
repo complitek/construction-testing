@@ -58,6 +58,13 @@ export default function MasterLogPage() {
 
   return (
     <div>
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-6 flex-wrap">
+        <Link href="/" className="hover:text-blue-600">Construction Testing</Link>
+        <span>›</span>
+        <Link href="/concrete" className="hover:text-blue-600">Concrete</Link>
+        <span>›</span>
+        <span className="text-gray-900 font-medium">Master Concrete Log</span>
+      </div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Master Concrete Log</h1>
         <span className="text-sm text-gray-500">{rows.length} sample sets</span>

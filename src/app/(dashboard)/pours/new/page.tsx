@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { ExtractedTicketData } from '@/lib/types'
 
 export default function NewPourPage() {
@@ -64,6 +65,15 @@ export default function NewPourPage() {
 
   return (
     <div className="max-w-2xl">
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-6 flex-wrap">
+        <Link href="/" className="hover:text-blue-600">Construction Testing</Link>
+        <span>›</span>
+        <Link href="/concrete" className="hover:text-blue-600">Concrete</Link>
+        <span>›</span>
+        <Link href="/pours" className="hover:text-blue-600">Pour Log</Link>
+        <span>›</span>
+        <span className="text-gray-900 font-medium">New Pour</span>
+      </div>
       <h1 className="text-2xl font-bold mb-6">New Pour Event</h1>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

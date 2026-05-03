@@ -69,149 +69,161 @@ export default function PourDetailPage() {
     setAttaching(false)
   }
 
-  if (!pour) return <p className="text-gray-400">Loading...</p>
-
   return (
     <div className="max-w-4xl">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{pour.date} — {pour.shift} shift</h1>
-          <p className="text-gray-500 text-sm mt-1">{pour.location} | {pour.supplier} | Mix: {pour.mixId}</p>
-        </div>
-        <Link href={`/pours/${pourId}/edit`} className="text-sm text-blue-600 hover:underline">Edit</Link>
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-6 flex-wrap">
+        <Link href="/" className="hover:text-blue-600">Construction Testing</Link>
+        <span>›</span>
+        <Link href="/concrete" className="hover:text-blue-600">Concrete</Link>
+        <span>›</span>
+        <Link href="/pours" className="hover:text-blue-600">Pour Log</Link>
+        <span>›</span>
+        <span className="text-gray-900 font-medium">{pour?.date ?? '...'}</span>
       </div>
 
-      <section className="mb-8">
-        <h2 className="font-bold text-lg mb-3">Sample Sets</h2>
-        <div className="space-y-2">
-          {samples.map(s => (
-            <Link
-              key={s.id}
-              href={`/samples/${s.id}`}
-              className="flex items-center justify-between p-4 bg-white border rounded-lg hover:border-blue-400"
-            >
-              <div>
-                <span className="font-medium">Ticket #{s.batchTicketNumber}</span>
-                <span className={`ml-3 text-xs px-2 py-0.5 rounded-full ${
-                  s.matchStatus === 'auto_matched' ? 'bg-green-100 text-green-700' :
-                  s.matchStatus === 'manually_confirmed' ? 'bg-blue-100 text-blue-700' :
-                  s.matchStatus === 'flagged' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-gray-100 text-gray-600'
-                }`}>{s.matchStatus.replace('_', ' ')}</span>
-              </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                s.reportStatus === 'exported' ? 'bg-green-100 text-green-700' :
-                s.reportStatus === 'ready_to_export' ? 'bg-blue-100 text-blue-700' :
-                'bg-gray-100 text-gray-500'
-              }`}>{s.reportStatus.replace('_', ' ')}</span>
-            </Link>
-          ))}
-        </div>
+      {!pour && <p className="text-gray-400">Loading...</p>}
 
-        <div className="flex gap-2 mt-3">
-          <input
-            type="text"
-            placeholder="Batch ticket number"
-            value={newTicket}
-            onChange={e => setNewTicket(e.target.value)}
-            className="border rounded px-3 py-2 text-sm flex-1"
-          />
-          <button
-            onClick={addSampleSet}
-            disabled={addingTicket}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
-          >
-            Add Sample Set
-          </button>
-        </div>
-      </section>
-
-      <section className="mb-8">
-        <h2 className="font-bold text-lg mb-3">Upload Combined Batch Ticket PDF</h2>
-        <div className="bg-gray-50 border rounded-lg p-4">
-          <input type="file" accept=".pdf" onChange={e => setUploadFile(e.target.files?.[0] ?? null)} className="text-sm mb-3 block" />
-          <button
-            onClick={uploadCombinedPdf}
-            disabled={!uploadFile || uploading}
-            className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50"
-          >
-            {uploading ? 'Processing...' : 'Upload & Process'}
-          </button>
-          {uploadResult && <p className="mt-3 text-sm text-green-700">{uploadResult}</p>}
-        </div>
-      </section>
-
-      {/* Batch Ticket Attachments */}
-      <section className="mb-8">
-        <h2 className="font-bold text-lg mb-3">Batch Ticket Attachments</h2>
-
-        {tickets.length > 0 && (
-          <div className="bg-white border rounded-lg overflow-hidden mb-3">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-2">Ticket #</th>
-                  <th className="text-left px-4 py-2">Pages</th>
-                  <th className="text-left px-4 py-2">File</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tickets.map(t => (
-                  <tr key={t.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-2">{t.batchTicketNumber ?? '—'}</td>
-                    <td className="px-4 py-2 text-gray-500 text-xs">
-                      {t.pageStart === t.pageEnd ? `p.${t.pageStart + 1}` : `p.${t.pageStart + 1}–${t.pageEnd + 1}`}
-                    </td>
-                    <td className="px-4 py-2">
-                      <a href={t.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
-                        View
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {pour && <>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">{pour.date} — {pour.shift} shift</h1>
+            <p className="text-gray-500 text-sm mt-1">{pour.location} | {pour.supplier} | Mix: {pour.mixId}</p>
           </div>
-        )}
+          <Link href={`/pours/${pourId}/edit`} className="text-sm text-blue-600 hover:underline">Edit</Link>
+        </div>
 
-        <div className="bg-gray-50 border rounded-lg p-4">
-          <p className="text-xs text-gray-500 mb-3">Attach an individual ticket image or PDF directly (no AI processing)</p>
-          <div className="flex flex-col gap-2">
+        <section className="mb-8">
+          <h2 className="font-bold text-lg mb-3">Sample Sets</h2>
+          <div className="space-y-2">
+            {samples.map(s => (
+              <Link
+                key={s.id}
+                href={`/samples/${s.id}`}
+                className="flex items-center justify-between p-4 bg-white border rounded-lg hover:border-blue-400"
+              >
+                <div>
+                  <span className="font-medium">Ticket #{s.batchTicketNumber}</span>
+                  <span className={`ml-3 text-xs px-2 py-0.5 rounded-full ${
+                    s.matchStatus === 'auto_matched' ? 'bg-green-100 text-green-700' :
+                    s.matchStatus === 'manually_confirmed' ? 'bg-blue-100 text-blue-700' :
+                    s.matchStatus === 'flagged' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>{s.matchStatus.replace('_', ' ')}</span>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  s.reportStatus === 'exported' ? 'bg-green-100 text-green-700' :
+                  s.reportStatus === 'ready_to_export' ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>{s.reportStatus.replace('_', ' ')}</span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="flex gap-2 mt-3">
             <input
               type="text"
-              placeholder="Ticket number (optional)"
-              value={attachTicketNumber}
-              onChange={e => setAttachTicketNumber(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm w-48"
+              placeholder="Batch ticket number"
+              value={newTicket}
+              onChange={e => setNewTicket(e.target.value)}
+              className="border rounded px-3 py-2 text-sm flex-1"
             />
-            <div className="flex items-center gap-2">
+            <button
+              onClick={addSampleSet}
+              disabled={addingTicket}
+              className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+            >
+              Add Sample Set
+            </button>
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="font-bold text-lg mb-3">Upload Combined Batch Ticket PDF</h2>
+          <div className="bg-gray-50 border rounded-lg p-4">
+            <input type="file" accept=".pdf" onChange={e => setUploadFile(e.target.files?.[0] ?? null)} className="text-sm mb-3 block" />
+            <button
+              onClick={uploadCombinedPdf}
+              disabled={!uploadFile || uploading}
+              className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50"
+            >
+              {uploading ? 'Processing...' : 'Upload & Process'}
+            </button>
+            {uploadResult && <p className="mt-3 text-sm text-green-700">{uploadResult}</p>}
+          </div>
+        </section>
+
+        {/* Batch Ticket Attachments */}
+        <section className="mb-8">
+          <h2 className="font-bold text-lg mb-3">Batch Ticket Attachments</h2>
+
+          {tickets.length > 0 && (
+            <div className="bg-white border rounded-lg overflow-hidden mb-3">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left px-4 py-2">Ticket #</th>
+                    <th className="text-left px-4 py-2">Pages</th>
+                    <th className="text-left px-4 py-2">File</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tickets.map(t => (
+                    <tr key={t.id} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-2">{t.batchTicketNumber ?? '—'}</td>
+                      <td className="px-4 py-2 text-gray-500 text-xs">
+                        {t.pageStart === t.pageEnd ? `p.${t.pageStart + 1}` : `p.${t.pageStart + 1}–${t.pageEnd + 1}`}
+                      </td>
+                      <td className="px-4 py-2">
+                        <a href={t.fileUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">
+                          View
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="bg-gray-50 border rounded-lg p-4">
+            <p className="text-xs text-gray-500 mb-3">Attach an individual ticket image or PDF directly (no AI processing)</p>
+            <div className="flex flex-col gap-2">
               <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={e => setAttachFile(e.target.files?.[0] ?? null)}
-                className="text-sm"
+                type="text"
+                placeholder="Ticket number (optional)"
+                value={attachTicketNumber}
+                onChange={e => setAttachTicketNumber(e.target.value)}
+                className="border rounded px-3 py-1.5 text-sm w-48"
               />
-              <button
-                onClick={attachTicket}
-                disabled={!attachFile || attaching}
-                className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-              >
-                {attaching ? 'Attaching...' : 'Attach Ticket'}
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={e => setAttachFile(e.target.files?.[0] ?? null)}
+                  className="text-sm"
+                />
+                <button
+                  onClick={attachTicket}
+                  disabled={!attachFile || attaching}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {attaching ? 'Attaching...' : 'Attach Ticket'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section>
-        <h2 className="font-bold text-lg mb-3">Download All Reports</h2>
-        <a
-          href={`/api/reports/bulk?pourId=${pourId}`}
-          className="inline-block bg-gray-800 text-white px-4 py-2 rounded text-sm hover:bg-gray-900"
-        >
-          Download ZIP
-        </a>
-      </section>
+        <section>
+          <h2 className="font-bold text-lg mb-3">Download All Reports</h2>
+          <a
+            href={`/api/reports/bulk?pourId=${pourId}`}
+            className="inline-block bg-gray-800 text-white px-4 py-2 rounded text-sm hover:bg-gray-900"
+          >
+            Download ZIP
+          </a>
+        </section>
+      </>}
     </div>
   )
 }
