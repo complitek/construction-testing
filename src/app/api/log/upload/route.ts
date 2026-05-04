@@ -25,15 +25,18 @@ export async function POST(request: Request) {
 
   const bytes = Buffer.from(await file.arrayBuffer())
   const blob = await put(`master-log/${Date.now()}-${file.name}`, bytes, {
-    access: 'public',
+    access: 'private',
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 
-  await db.insert(appSettings)
-    .values({ key: 'master_log_url', value: blob.url, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: appSettings.key, set: { value: blob.url, updatedAt: new Date() } })
+  const uploadedAt = new Date().toISOString()
+  const meta = JSON.stringify({ url: blob.url, fileName: file.name, uploadedAt })
 
-  return NextResponse.json({ url: blob.url })
+  await db.insert(appSettings)
+    .values({ key: 'master_log_url', value: meta, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: meta, updatedAt: new Date() } })
+
+  return NextResponse.json({ url: blob.url, fileName: file.name, uploadedAt })
 }
 
 export async function GET() {
@@ -42,5 +45,11 @@ export async function GET() {
 
   const [setting] = await db.select().from(appSettings)
     .where(eq(appSettings.key, 'master_log_url'))
-  return NextResponse.json({ url: setting?.value ?? null })
+  if (!setting) return NextResponse.json({ url: null, fileName: null, uploadedAt: null })
+  try {
+    const meta = JSON.parse(setting.value)
+    return NextResponse.json(meta)
+  } catch {
+    return NextResponse.json({ url: setting.value, fileName: null, uploadedAt: null })
+  }
 }

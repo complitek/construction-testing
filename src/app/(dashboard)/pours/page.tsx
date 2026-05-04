@@ -9,7 +9,7 @@ export default function PourListPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
-    fetch('/api/pours').then(r => r.json()).then(setPours)
+    fetch('/api/pours').then(r => r.json()).then(data => { if (Array.isArray(data)) setPours(data) })
   }, [])
 
   function toggleSort(field: 'date' | 'mixId' | 'location') {
@@ -48,24 +48,24 @@ export default function PourListPage() {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th
-                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-gray-100"
+                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-blue-50 text-blue-700"
                 onClick={() => toggleSort('date')}
               >
-                Date {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                Date {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
               </th>
               <th className="text-left px-4 py-3">Shift</th>
               <th
-                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-gray-100"
+                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-blue-50 text-blue-700"
                 onClick={() => toggleSort('location')}
               >
-                Location {sortBy === 'location' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                Location {sortBy === 'location' ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
               </th>
               <th className="text-left px-4 py-3">Supplier</th>
               <th
-                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-gray-100"
+                className="text-left px-4 py-3 cursor-pointer select-none hover:bg-blue-50 text-blue-700"
                 onClick={() => toggleSort('mixId')}
               >
-                Mix ID {sortBy === 'mixId' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                Mix ID {sortBy === 'mixId' ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}
               </th>
               <th className="text-left px-4 py-3"></th>
             </tr>

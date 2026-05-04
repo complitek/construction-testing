@@ -16,16 +16,16 @@ export default function LogsPage() {
           <h2 className="font-bold text-lg">Master Concrete Log</h2>
           <p className="text-sm mt-1 text-gray-500">All concrete placements, break results, and compression reports</p>
         </Link>
-        <div className="block p-6 bg-white border rounded-lg border-dashed">
-          <h2 className="font-bold text-lg text-gray-400">Soils Log</h2>
+        <div className="p-6 bg-white border rounded-lg border-dashed">
+          <h3 className="font-bold text-gray-400">Soils Log</h3>
           <p className="text-sm mt-1 text-gray-400">Coming soon</p>
         </div>
-        <div className="block p-6 bg-white border rounded-lg border-dashed">
-          <h2 className="font-bold text-lg text-gray-400">Welding Log</h2>
+        <div className="p-6 bg-white border rounded-lg border-dashed">
+          <h3 className="font-bold text-gray-400">Welding Log</h3>
           <p className="text-sm mt-1 text-gray-400">Coming soon</p>
         </div>
-        <div className="block p-6 bg-white border rounded-lg border-dashed">
-          <h2 className="font-bold text-lg text-gray-400">Structural Log</h2>
+        <div className="p-6 bg-white border rounded-lg border-dashed">
+          <h3 className="font-bold text-gray-400">Structural Log</h3>
           <p className="text-sm mt-1 text-gray-400">Coming soon</p>
         </div>
       </div>

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const blob = await put(
     `tickets/attached/${pourId}-${Date.now()}-${file.name}`,
     bytes,
-    { access: 'public', contentType: file.type }
+    { access: 'private', contentType: file.type }
   )
 
   const [record] = await db.insert(ticketRecords).values({

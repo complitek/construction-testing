@@ -80,7 +80,7 @@ export async function GET(request: Request) {
       const blob = await put(
         `reports/${sampleRow.id}.pdf`,
         Buffer.from(finalPdf),
-        { access: 'public', contentType: 'application/pdf', allowOverwrite: true }
+        { access: 'private', contentType: 'application/pdf', allowOverwrite: true }
       )
 
       await db.update(sampleSets)

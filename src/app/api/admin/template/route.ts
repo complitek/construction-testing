@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   const blob = await put('templates/compression-report.xlsx', file, {
-    access: 'public',
+    access: 'private',
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 

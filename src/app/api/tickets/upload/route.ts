@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const pdfBytes = Buffer.from(await file.arrayBuffer())
 
   const originalBlob = await put(`tickets/combined/${pourId}-${Date.now()}.pdf`, pdfBytes, {
-    access: 'public', contentType: 'application/pdf',
+    access: 'private', contentType: 'application/pdf',
   })
 
   const [upload] = await db.insert(ticketUploads).values({
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const blob = await put(
       `tickets/extracted/${pourId}-p${match.pageStart}-${match.pageEnd}-${Date.now()}.pdf`,
       Buffer.from(group.bytes),
-      { access: 'public', contentType: 'application/pdf' }
+      { access: 'private', contentType: 'application/pdf' }
     )
 
     const [record] = await db.insert(ticketRecords).values({

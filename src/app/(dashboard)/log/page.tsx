@@ -18,6 +18,8 @@ export default function MasterLogPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null)
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null)
+  const [uploadedAt, setUploadedAt] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'date' | 'mixId'>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -26,7 +28,11 @@ export default function MasterLogPage() {
       setRows(data)
       setLoading(false)
     })
-    fetch('/api/log/upload').then(r => r.json()).then(d => setUploadedUrl(d.url)).catch(() => {})
+    fetch('/api/log/upload').then(r => r.json()).then(d => {
+      setUploadedUrl(d.url)
+      setUploadedFileName(d.fileName)
+      setUploadedAt(d.uploadedAt)
+    }).catch(() => {})
   }, [])
 
   function toggleSort(field: 'date' | 'mixId') {
@@ -52,6 +58,8 @@ export default function MasterLogPage() {
     const res = await fetch('/api/log/upload', { method: 'POST', body: fd })
     const data = await res.json()
     setUploadedUrl(data.url)
+    setUploadedFileName(data.fileName)
+    setUploadedAt(data.uploadedAt)
     setUploading(false)
   }
 
@@ -77,7 +85,13 @@ export default function MasterLogPage() {
           <h2 className="font-semibold text-sm mb-2">Upload Existing Master Log</h2>
           {uploadedUrl && (
             <p className="text-xs text-green-700 mb-2">
-              File on record. <a href={uploadedUrl} className="underline" target="_blank" rel="noreferrer">View</a>
+              <span className="font-medium">{uploadedFileName ?? 'File on record'}</span>
+              {uploadedAt && (
+                <span className="ml-2 text-gray-500">
+                  — Uploaded {new Date(uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+              {' '}<a href={uploadedUrl!} className="underline" target="_blank" rel="noreferrer">Download</a>
             </p>
           )}
           <DropZone
