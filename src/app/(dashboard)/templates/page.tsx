@@ -135,6 +135,40 @@ export default function TemplatesPage() {
           {TEMPLATE_SECTIONS.map(section => (
             <TemplateRow key={section.key} section={section} />
           ))}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
+            <h3 className="font-semibold text-sm text-blue-800 mb-3">Available Placeholders for Compression Report Template</h3>
+            <p className="text-xs text-blue-700 mb-3">Put these in your Excel template cells where you want data to appear:</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-xs font-mono text-blue-900">
+              {[
+                ['{{date}}', 'Placement date'],
+                ['{{shift}}', 'Day or night'],
+                ['{{spec}}', 'Specification'],
+                ['{{location}}', 'Location'],
+                ['{{description}}', 'Description'],
+                ['{{supplier}}', 'Supplier'],
+                ['{{mix_id}}', 'Mix design ID'],
+                ['{{ticket_number}}', 'Batch ticket #'],
+                ['{{temperature}}', 'Temp °F'],
+                ['{{slump}}', 'Slump/spread'],
+                ['{{unit_weight}}', 'Unit weight pcf'],
+                ['{{air_content}}', 'Air content %'],
+                ['{{break_1day}}', '1-day PSI'],
+                ['{{break_7day}}', '7-day PSI'],
+                ['{{break_14day}}', '14-day PSI'],
+                ['{{break_21day}}', '21-day PSI'],
+                ['{{break_28day}}', '28-day PSI'],
+                ['{{break_56day}}', '56-day PSI'],
+                ['{{date_7day}}', '7-day break date'],
+                ['{{date_28day}}', '28-day break date'],
+              ].map(([ph, label]) => (
+                <div key={ph} className="flex gap-2">
+                  <span className="text-blue-600">{ph}</span>
+                  <span className="text-blue-500">— {label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
