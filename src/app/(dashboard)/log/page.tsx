@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import DropZone from '@/components/DropZone'
 import type { BreakAge } from '@/lib/types'
 import { BREAK_AGES } from '@/lib/types'
 import type { LogRow } from '@/app/api/log/route'
@@ -79,21 +80,19 @@ export default function MasterLogPage() {
               File on record. <a href={uploadedUrl} className="underline" target="_blank" rel="noreferrer">View</a>
             </p>
           )}
-          <div className="flex items-center gap-2">
-            <input
-              type="file"
-              accept=".xlsx"
-              onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
-              className="text-xs flex-1"
-            />
-            <button
-              onClick={uploadMasterLog}
-              disabled={!uploadFile || uploading}
-              className="bg-gray-700 text-white px-3 py-1.5 rounded text-xs hover:bg-gray-800 disabled:opacity-50 whitespace-nowrap"
-            >
-              {uploading ? 'Uploading...' : 'Upload'}
-            </button>
-          </div>
+          <DropZone
+            accept=".xlsx"
+            onFile={file => { setUploadFile(file); }}
+            label="Drag & drop master log Excel file"
+            currentFileName={uploadFile?.name ?? null}
+          />
+          <button
+            onClick={uploadMasterLog}
+            disabled={!uploadFile || uploading}
+            className="mt-3 w-full bg-gray-700 text-white px-3 py-2 rounded text-sm hover:bg-gray-800 disabled:opacity-50"
+          >
+            {uploading ? 'Uploading...' : 'Upload Master Log'}
+          </button>
         </div>
 
         {/* Download current data */}

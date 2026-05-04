@@ -1,12 +1,12 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import DropZone from '@/components/DropZone'
 import type { ExtractedTicketData } from '@/lib/types'
 
 export default function NewPourPage() {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
   const [scanning, setScanning] = useState(false)
   const [form, setForm] = useState({
     date: '', shift: 'day', spec: '', location: '',
@@ -77,16 +77,19 @@ export default function NewPourPage() {
       <h1 className="text-2xl font-bold mb-6">New Pour Event</h1>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-sm font-medium text-blue-800 mb-2">Scan a batch ticket to auto-fill</p>
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={scanning}
-          className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-        >
-          {scanning ? 'Reading ticket...' : 'Upload / Photo Ticket'}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScan} />
+        <p className="text-sm font-medium text-blue-800 mb-3">Scan a batch ticket to auto-fill</p>
+        {scanning ? (
+          <div className="text-center py-4 text-blue-700 text-sm font-medium">Reading ticket...</div>
+        ) : (
+          <DropZone
+            accept="image/*"
+            onFile={file => {
+              const e = { target: { files: [file] } } as unknown as React.ChangeEvent<HTMLInputElement>
+              handleScan(e)
+            }}
+            label="Drag & drop or photo a batch ticket"
+          />
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

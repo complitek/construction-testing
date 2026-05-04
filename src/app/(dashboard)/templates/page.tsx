@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
+import DropZone from '@/components/DropZone'
 
 const TEMPLATE_ROLES = ['lab_manager', 'qc_manager', 'alt_qc_manager', 'office_manager']
 
@@ -85,21 +86,19 @@ function TemplateRow({ section }: { section: TemplateSection }) {
               <a href={url} target="_blank" rel="noreferrer" className="underline">Download</a>
             </p>
           )}
-          <div className="flex items-center gap-3">
-            <input
-              type="file"
-              accept={section.accept}
-              onChange={e => setFile(e.target.files?.[0] ?? null)}
-              className="text-sm text-gray-600"
-            />
-            <button
-              onClick={upload}
-              disabled={!file || uploading}
-              className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-            >
-              {uploading ? 'Uploading...' : url ? 'Replace Template' : 'Upload Template'}
-            </button>
-          </div>
+          <DropZone
+            accept={section.accept}
+            onFile={setFile}
+            label={`Drag & drop ${section.label} template`}
+            currentFileName={file?.name ?? null}
+          />
+          <button
+            onClick={upload}
+            disabled={!file || uploading}
+            className="mt-3 w-full bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          >
+            {uploading ? 'Uploading...' : url ? 'Replace Template' : 'Upload Template'}
+          </button>
         </>
       ) : (
         <p className="text-xs text-gray-400">Template management for this discipline will be available when the module is built.</p>

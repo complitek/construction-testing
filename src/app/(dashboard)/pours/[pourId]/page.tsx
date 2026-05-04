@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import DropZone from '@/components/DropZone'
 import type { PourEvent, SampleSet } from '@/lib/types'
 
 export default function PourDetailPage() {
@@ -140,11 +141,16 @@ export default function PourDetailPage() {
         <section className="mb-8">
           <h2 className="font-bold text-lg mb-3">Upload Combined Batch Ticket PDF</h2>
           <div className="bg-gray-50 border rounded-lg p-4">
-            <input type="file" accept=".pdf" onChange={e => setUploadFile(e.target.files?.[0] ?? null)} className="text-sm mb-3 block" />
+            <DropZone
+              accept=".pdf"
+              onFile={setUploadFile}
+              label="Drag & drop combined batch ticket PDF"
+              currentFileName={uploadFile?.name ?? null}
+            />
             <button
               onClick={uploadCombinedPdf}
               disabled={!uploadFile || uploading}
-              className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50"
+              className="mt-3 w-full bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50"
             >
               {uploading ? 'Processing...' : 'Upload & Process'}
             </button>
@@ -195,21 +201,19 @@ export default function PourDetailPage() {
                 onChange={e => setAttachTicketNumber(e.target.value)}
                 className="border rounded px-3 py-1.5 text-sm w-48"
               />
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={e => setAttachFile(e.target.files?.[0] ?? null)}
-                  className="text-sm"
-                />
-                <button
-                  onClick={attachTicket}
-                  disabled={!attachFile || attaching}
-                  className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-                >
-                  {attaching ? 'Attaching...' : 'Attach Ticket'}
-                </button>
-              </div>
+              <DropZone
+                accept="image/*,.pdf"
+                onFile={setAttachFile}
+                label="Drag & drop ticket image or PDF"
+                currentFileName={attachFile?.name ?? null}
+              />
+              <button
+                onClick={attachTicket}
+                disabled={!attachFile || attaching}
+                className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                {attaching ? 'Attaching...' : 'Attach Ticket'}
+              </button>
             </div>
           </div>
         </section>
