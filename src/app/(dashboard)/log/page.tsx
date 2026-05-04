@@ -1,11 +1,78 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import DropZone from '@/components/DropZone'
 import type { BreakAge } from '@/lib/types'
 import { BREAK_AGES } from '@/lib/types'
 import type { LogRow } from '@/app/api/log/route'
 
+
+function EditableBreakCell({ sampleId, age, value, onSaved }: {
+  sampleId: string
+  age: BreakAge
+  value: number | undefined
+  onSaved: (age: BreakAge, newValue: number | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [input, setInput] = useState(value != null ? String(value) : '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  async function save() {
+    setSaving(true)
+    setEditing(false)
+    const num = input.trim() === '' ? null : Number(input)
+    try {
+      const res = await fetch(`/api/samples/${sampleId}/breaks`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [age]: num }),
+      })
+      if (res.ok) {
+        onSaved(age, num)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1500)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="number"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onBlur={save}
+        onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+        className="w-16 border border-blue-400 rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+      />
+    )
+  }
+
+  return (
+    <span
+      onClick={() => { setInput(value != null ? String(value) : ''); setEditing(true) }}
+      className={`cursor-pointer px-1 py-0.5 rounded hover:bg-blue-50 hover:text-blue-700 transition-colors ${saving ? 'opacity-50' : ''}`}
+      title="Click to edit"
+    >
+      {saved ? (
+        <span className="text-green-600 font-bold">✓</span>
+      ) : value != null ? (
+        <span className="font-medium">{value}</span>
+      ) : (
+        <span className="text-gray-300 hover:text-blue-400">—</span>
+      )}
+    </span>
+  )
+}
 
 const AGE_LABEL: Record<BreakAge, string> = {
   '1day': '1d', '3day': '3d', '4day': '4d', '5day': '5d', '7day': '7d',
@@ -49,6 +116,16 @@ export default function MasterLogPage() {
     const bv = b[sortBy] ?? ''
     return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
   })
+
+  function updateBreak(sampleId: string, age: BreakAge, newValue: number | null) {
+    setRows(prev => prev.map(row => {
+      if (row.sampleId !== sampleId) return row
+      const breaks = { ...row.breaks }
+      if (newValue == null) delete breaks[age]
+      else breaks[age] = newValue
+      return { ...row, breaks }
+    }))
+  }
 
   async function uploadMasterLog() {
     if (!uploadFile) return
@@ -176,10 +253,12 @@ export default function MasterLogPage() {
                   </td>
                   {BREAK_AGES.map(age => (
                     <td key={age} className="px-3 py-2 border-b text-center">
-                      {row.breaks[age] != null
-                        ? <span className="font-medium">{row.breaks[age]}</span>
-                        : <span className="text-gray-300">—</span>
-                      }
+                      <EditableBreakCell
+                        sampleId={row.sampleId}
+                        age={age}
+                        value={row.breaks[age]}
+                        onSaved={(a, v) => updateBreak(row.sampleId, a, v)}
+                      />
                     </td>
                   ))}
                   <td className="px-3 py-2 border-b whitespace-nowrap">
