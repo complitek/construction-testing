@@ -144,8 +144,10 @@ export async function POST(request: Request) {
     let matchedSummary: SummarySel | undefined
 
     if (batchTicketNumber) {
+      // Look up both — same batch # can appear in PW sampleSets AND DD5 summaryRecords,
+      // and both should get a link to the ticket so each report attaches the scan.
       matchedSample = findSample(batchTicketNumber)
-      if (!matchedSample) matchedSummary = findSummary(batchTicketNumber)
+      matchedSummary = findSummary(batchTicketNumber)
     }
 
     const status = !batchTicketNumber ? 'flagged'
@@ -183,7 +185,7 @@ export async function POST(request: Request) {
   }
   const allUploads = await pool(groups, 8, async (group, idx) => {
     const result = results[idx]
-    const prefix = result.matchedSummaryId ? 'dd5' : result.matchedSampleId ? 'pw' : 'unmatched'
+    const prefix = result.matchedSampleId ? 'pw' : result.matchedSummaryId ? 'dd5' : 'unmatched'
     const blob = await putWithRetry(
       `tickets/bulk/${month}/${prefix}-p${group.pageStart}-${group.pageEnd}-${ts}.pdf`,
       Buffer.from(group.bytes),
@@ -242,7 +244,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     totalPages,
     totalTickets: groups.length,
-    matched: matchedSamples.length + matchedSummaries.length,
+    matched: results.filter(r => r.status === 'matched').length,
     unmatched: results.filter(r => r.status === 'unmatched').length,
     flagged: results.filter(r => r.status === 'flagged').length,
     results,

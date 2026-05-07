@@ -47,24 +47,34 @@ export async function extractTicketData(
 }
 
 export async function extractTicketDataFromPdf(
-  pdfBytes: Uint8Array
+  pdfBytes: Uint8Array,
+  attempts = 3,
 ): Promise<ExtractedTicketData> {
   const base64 = Buffer.from(pdfBytes).toString('base64')
-  try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: EXTRACT_PROMPT },
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-        ],
-      }],
-    })
-    const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
-    return parseExtractResponse(raw)
-  } catch {
-    return { batchTicketNumber: null, date: null, supplier: null, mixId: null, confidence: 'low' }
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 256,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: EXTRACT_PROMPT },
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+          ],
+        }],
+      })
+      const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
+      return parseExtractResponse(raw)
+    } catch (e) {
+      lastErr = e
+      if (i < attempts - 1) {
+        const delay = 500 * Math.pow(2, i) + Math.floor(Math.random() * 250)
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
   }
+  console.warn('[extract-ticket] all attempts failed:', lastErr instanceof Error ? lastErr.message : lastErr)
+  return { batchTicketNumber: null, date: null, supplier: null, mixId: null, confidence: 'low' }
 }
