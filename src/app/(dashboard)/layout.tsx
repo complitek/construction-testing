@@ -1,7 +1,12 @@
+import { currentUser } from '@clerk/nextjs/server'
 import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const user = await currentUser()
+  const role = user?.publicMetadata?.role as string | undefined
+  const admin = role === 'admin'
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b px-6 py-3 flex items-center justify-between">
@@ -12,8 +17,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/welding" className="text-sm text-gray-600 hover:text-gray-900">Welding</Link>
           <Link href="/structural" className="text-sm text-gray-600 hover:text-gray-900">Structural</Link>
           <Link href="/logs" className="text-sm text-gray-600 hover:text-gray-900">Logs</Link>
-          <Link href="/templates" className="text-sm text-gray-600 hover:text-gray-900">Templates</Link>
-          <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">Admin</Link>
+          {admin && (
+            <Link href="/templates" className="text-sm text-gray-600 hover:text-gray-900">Templates</Link>
+          )}
+          {admin && (
+            <Link href="/admin" className="text-sm text-gray-600 hover:text-gray-900">Admin</Link>
+          )}
         </div>
         <UserButton />
       </nav>

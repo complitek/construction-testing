@@ -1,49 +1,19 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { sampleSets, pourEvents } from '@/lib/db/schema'
-import { getUserRole } from '@/lib/auth/get-user-role'
-import { hasPermission } from '@/lib/auth/permissions'
-import { eq, and, gte, lte } from 'drizzle-orm'
+import { sampleSets, pourEvents, ticketRecords, appSettings } from '@/lib/db/schema'
+import { eq, and, gte, lte, inArray } from 'drizzle-orm'
 import { renderReportPdf } from '@/lib/pdf/render-report'
 import { mergeReportWithTicket } from '@/lib/pdf/merge'
 import { createZipFromPdfs } from '@/lib/utils/zip'
-import type { PourEvent, SampleSet, BreakAge, BreakResults } from '@/lib/types'
+import type { BreakAge, BreakResults } from '@/lib/types'
 import { BREAK_AGES } from '@/lib/types'
 
 export const maxDuration = 300
 
-function toSampleSet(row: typeof sampleSets.$inferSelect): SampleSet {
-  const breaks: BreakResults = {}
-  const map: Record<BreakAge, number | null> = {
-    '1day': row.break1day, '3day': row.break3day, '4day': row.break4day,
-    '5day': row.break5day, '7day': row.break7day, '14day': row.break14day,
-    '21day': row.break21day, '28day': row.break28day, '56day': row.break56day, '90day': row.break90day,
-    '120day': row.break120day,
-  }
-  for (const age of BREAK_AGES) { if (map[age] != null) breaks[age] = map[age]! }
-  return {
-    id: row.id, pourEventId: row.pourEventId, batchTicketNumber: row.batchTicketNumber,
-    ticketFileUrl: row.ticketFileUrl, matchStatus: row.matchStatus, breaks,
-    reportStatus: row.reportStatus,
-    reportFileUrl: row.reportFileUrl ?? null,
-    temperature: row.temperature ?? null,
-    slump: row.slump ?? null,
-    unitWeight: row.unitWeight ?? null,
-    airContent: row.airContent ?? null,
-    createdBy: row.createdBy,
-    createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-  }
-}
-
 export async function GET(request: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const role = await getUserRole()
-  if (!role || !hasPermission(role, 'bulk_download')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
 
   const url = new URL(request.url)
   const pourId = url.searchParams.get('pourId')
@@ -62,7 +32,22 @@ export async function GET(request: Request) {
       samples.push(...s)
     }
   } else {
-    return NextResponse.json({ error: 'pourId or dateFrom+dateTo required' }, { status: 400 })
+    // No filter — return all
+    samples = await db.select().from(sampleSets)
+  }
+
+  // Fetch project settings once for all reports
+  const settingRows = await db.select().from(appSettings)
+    .where(inArray(appSettings.key, ['project_name', 'project_location', 'company_name', 'contract_number', 'report_prepared_by', 'logo_url', 'brand_color']))
+  const settingsMap = Object.fromEntries(settingRows.map(r => [r.key, r.value]))
+  const projectSettings = {
+    projectName:      settingsMap['project_name']       ?? null,
+    projectLocation:  settingsMap['project_location']   ?? null,
+    companyName:      settingsMap['company_name']        ?? null,
+    contractNumber:   settingsMap['contract_number']     ?? null,
+    reportPreparedBy: settingsMap['report_prepared_by']  ?? null,
+    logoUrl:          settingsMap['logo_url']            ?? null,
+    brandColor:       settingsMap['brand_color']         ?? null,
   }
 
   const files: Array<{ name: string; data: Uint8Array }> = []
@@ -71,25 +56,62 @@ export async function GET(request: Request) {
     const [pourRow] = await db.select().from(pourEvents).where(eq(pourEvents.id, sampleRow.pourEventId))
     if (!pourRow) continue
 
-    const pour: PourEvent = {
-      id: pourRow.id, date: pourRow.date, shift: pourRow.shift, spec: pourRow.spec,
-      location: pourRow.location, description: pourRow.description, supplier: pourRow.supplier,
-      mixId: pourRow.mixId, createdBy: pourRow.createdBy,
-      createdAt: pourRow.createdAt.toISOString(), updatedAt: pourRow.updatedAt.toISOString(),
+    const breaks: BreakResults = {}
+    const ageMap: Record<BreakAge, number | null> = {
+      '1day': sampleRow.break1day, '3day': sampleRow.break3day, '4day': sampleRow.break4day,
+      '5day': sampleRow.break5day, '7day': sampleRow.break7day, '14day': sampleRow.break14day,
+      '21day': sampleRow.break21day, '28day': sampleRow.break28day, '56day': sampleRow.break56day,
+      '90day': sampleRow.break90day, '120day': sampleRow.break120day,
     }
-    const sample = toSampleSet(sampleRow)
-    const reportBuffer = await renderReportPdf(pour, sample)
+    for (const age of BREAK_AGES) { if (ageMap[age] != null) breaks[age] = ageMap[age]! }
 
-    let finalPdf: Uint8Array = reportBuffer as unknown as Uint8Array
-    if (sampleRow.ticketFileUrl) {
-      const res = await fetch(sampleRow.ticketFileUrl)
-      if (res.ok) {
-        const ticketBytes = new Uint8Array(await res.arrayBuffer())
-        finalPdf = await mergeReportWithTicket(reportBuffer as unknown as Uint8Array, ticketBytes)
-      }
+    const reportBuffer = await renderReportPdf({
+      date: pourRow.date, shift: pourRow.shift, spec: pourRow.spec,
+      location: pourRow.location, description: pourRow.description,
+      supplier: pourRow.supplier, mixId: pourRow.mixId,
+      definableFeature: pourRow.definableFeature ?? null,
+      batchTicketNumber: sampleRow.batchTicketNumber,
+      sampleIdRange: sampleRow.sampleIdRange ?? null,
+      quantitySize: sampleRow.quantitySize ?? null,
+      area: sampleRow.area ?? null, pfuLocation: sampleRow.pfuLocation ?? null,
+      wallPanelControlNo: sampleRow.wallPanelControlNo ?? null,
+      structure: sampleRow.structure ?? null, element: sampleRow.element ?? null,
+      sampledBy: sampleRow.sampledBy ?? null, sampleType: sampleRow.sampleType ?? null,
+      testedBy: sampleRow.testedBy ?? null,
+      slump: sampleRow.slump ?? null, astmC1611Flow: sampleRow.astmC1611Flow ?? null,
+      airContent: sampleRow.airContent ?? null, temperature: sampleRow.temperature ?? null,
+      unitWeight: sampleRow.unitWeight ?? null, wcRatio: sampleRow.wcRatio ?? null,
+      vsi: sampleRow.vsi ?? null, ambientTemp: sampleRow.ambientTemp ?? null,
+      volumeCy: sampleRow.volumeCy ?? null,
+      marineConcreteCumulative: sampleRow.marineConcreteCumulative ?? null,
+      marineConcreteLoNumber: sampleRow.marineConcreteLoNumber ?? null,
+      requiredCompStrength: sampleRow.requiredCompStrength ?? null,
+      compliance: sampleRow.compliance ?? null, breaks,
+    }, projectSettings)
+
+    const ticketUrl = sampleRow.ticketFileUrl
+      ?? (await db.select().from(ticketRecords).where(eq(ticketRecords.pourEventId, pourRow.id)).limit(1))[0]?.fileUrl
+      ?? null
+
+    let finalPdf: Uint8Array = reportBuffer
+    if (ticketUrl) {
+      try {
+        const res = await fetch(ticketUrl, {
+          headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+        })
+        if (res.ok) {
+          const ticketBytes = new Uint8Array(await res.arrayBuffer())
+          finalPdf = await mergeReportWithTicket(reportBuffer, ticketBytes)
+        }
+      } catch { /* skip if ticket fetch fails */ }
     }
 
-    files.push({ name: `report-${pourRow.date}-${sampleRow.batchTicketNumber}.pdf`, data: finalPdf })
+    const dateStr = pourRow.date.replace(/-/g, '')
+    const locationStr = pourRow.location.replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_')
+    files.push({
+      name: `${dateStr}_${locationStr}_Report.pdf`,
+      data: finalPdf,
+    })
   }
 
   const zipBytes = await createZipFromPdfs(files)

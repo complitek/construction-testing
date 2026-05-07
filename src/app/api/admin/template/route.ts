@@ -23,16 +23,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'File storage is not configured yet.' }, { status: 503 })
   }
 
-  const blob = await put('templates/compression-report.xlsx', file, {
-    access: 'private',
-    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  })
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'xlsx'
+  const blobName = `templates/compression-report-${Date.now()}.${ext}`
+  const blob = await put(blobName, file, { access: 'private' })
 
   await db.insert(appSettings)
     .values({ key: 'excel_template_url', value: blob.url, updatedAt: new Date() })
     .onConflictDoUpdate({ target: appSettings.key, set: { value: blob.url, updatedAt: new Date() } })
 
-  return NextResponse.json({ url: blob.url })
+  await db.insert(appSettings)
+    .values({ key: 'excel_template_name', value: file.name, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: file.name, updatedAt: new Date() } })
+
+  return NextResponse.json({ url: blob.url, fileName: file.name })
+}
+
+export async function DELETE() {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const role = await getUserRole()
+  if (!role || !hasPermission(role, 'manage_templates')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  await db.delete(appSettings).where(eq(appSettings.key, 'excel_template_url'))
+  await db.delete(appSettings).where(eq(appSettings.key, 'excel_template_name'))
+  await db.delete(appSettings).where(eq(appSettings.key, 'excel_template_mapping'))
+
+  return NextResponse.json({ success: true })
 }
 
 export async function GET() {
@@ -43,6 +61,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, 'excel_template_url'))
-  return NextResponse.json({ url: setting?.value ?? null })
+  const [urlSetting] = await db.select().from(appSettings).where(eq(appSettings.key, 'excel_template_url'))
+  const [nameSetting] = await db.select().from(appSettings).where(eq(appSettings.key, 'excel_template_name'))
+  const [mappingSetting] = await db.select().from(appSettings).where(eq(appSettings.key, 'excel_template_mapping'))
+  const mappedFields = mappingSetting ? Object.keys(JSON.parse(mappingSetting.value)).length : null
+  return NextResponse.json({ url: urlSetting?.value ?? null, fileName: nameSetting?.value ?? null, mappedFields })
 }

@@ -24,6 +24,15 @@ export default function SampleDetailPage() {
   })
   const [savingFields, setSavingFields] = useState(false)
   const [fieldsSaved, setFieldsSaved] = useState(false)
+  const [hasTemplate, setHasTemplate] = useState(false)
+  const [holdForm, setHoldForm] = useState({ requiredBreakAge: '', notes: '', placedDate: '', brokenBy: '', brokenReason: '', brokenDate: '' })
+  const [showPlaceHold, setShowPlaceHold] = useState(false)
+  const [showBreakHold, setShowBreakHold] = useState(false)
+  const [savingHold, setSavingHold] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/template').then(r => r.json()).then(d => setHasTemplate(!!d.url)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch(`/api/samples/${sampleId}`).then(r => r.json()).then((s: SampleSet) => {
@@ -77,6 +86,19 @@ export default function SampleDetailPage() {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function saveHold(patch: Record<string, unknown>) {
+    setSavingHold(true)
+    const res = await fetch(`/api/samples/${sampleId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    const updated = await res.json()
+    setSample(updated)
+    setSavingHold(false)
+    setShowPlaceHold(false)
+    setShowBreakHold(false)
   }
 
   return (
@@ -195,27 +217,139 @@ export default function SampleDetailPage() {
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Break Results'}
           </button>
 
-          {sample.reportStatus !== 'pending_breaks' && (
-            <a
-              href={sample.reportFileUrl ?? `/api/samples/${sampleId}/report`}
-              className="bg-gray-800 text-white px-4 py-2 rounded text-sm hover:bg-gray-900"
-            >
-              Download Report PDF
-            </a>
+          <a
+            href={`/api/samples/${sampleId}/report`}
+            className="bg-gray-800 text-white px-4 py-2 rounded text-sm hover:bg-gray-900"
+          >
+            Download Report (PDF)
+          </a>
+        </div>
+
+        {/* ── Hold Management ── */}
+        <div className="mt-6 border rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between bg-gray-50 px-4 py-3 border-b">
+            <div className="flex items-center gap-3">
+              <h2 className="font-bold text-sm">Hold Status</h2>
+              {sample.holdActive && !sample.holdReleasedDate && !sample.holdBrokenDate && (
+                <span className="bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded-full">HOLD ACTIVE</span>
+              )}
+              {sample.holdBrokenDate && (
+                <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded-full">HOLD BROKEN</span>
+              )}
+              {sample.holdReleasedDate && !sample.holdBrokenDate && (
+                <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">HOLD RELEASED</span>
+              )}
+              {!sample.holdActive && !sample.holdBrokenDate && !sample.holdReleasedDate && (
+                <span className="text-gray-400 text-xs">No hold</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {!sample.holdActive && !sample.holdBrokenDate && !sample.holdReleasedDate && (
+                <button onClick={() => setShowPlaceHold(v => !v)} className="text-xs text-blue-600 hover:underline">Place Hold</button>
+              )}
+              {sample.holdActive && !sample.holdReleasedDate && !sample.holdBrokenDate && (
+                <>
+                  <button onClick={() => saveHold({ holdActive: false, holdReleasedDate: new Date().toISOString().split('T')[0] })} disabled={savingHold}
+                    className="text-xs text-green-600 hover:underline disabled:opacity-50">Release Hold</button>
+                  <button onClick={() => setShowBreakHold(v => !v)} className="text-xs text-yellow-600 hover:underline ml-2">Break Hold</button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="px-4 py-3 text-sm space-y-1">
+            {sample.holdActive && !sample.holdReleasedDate && !sample.holdBrokenDate && (
+              <>
+                {sample.holdRequiredBreakAge && <p className="text-gray-700">Required break to release: <span className="font-medium">{sample.holdRequiredBreakAge}</span></p>}
+                {sample.holdPlacedDate && <p className="text-gray-500 text-xs">Hold placed: {sample.holdPlacedDate}</p>}
+                {sample.holdNotes && <p className="text-gray-600 text-xs">{sample.holdNotes}</p>}
+              </>
+            )}
+            {sample.holdBrokenDate && (
+              <>
+                <p className="text-yellow-800">Approved to proceed — hold broken {sample.holdBrokenDate}</p>
+                {sample.holdBrokenBy && <p className="text-gray-600 text-xs">Authorized by: {sample.holdBrokenBy}</p>}
+                {sample.holdBrokenReason && <p className="text-gray-600 text-xs">Reason: {sample.holdBrokenReason}</p>}
+              </>
+            )}
+            {sample.holdReleasedDate && !sample.holdBrokenDate && (
+              <p className="text-green-700">Hold released {sample.holdReleasedDate}</p>
+            )}
+            {!sample.holdActive && !sample.holdBrokenDate && !sample.holdReleasedDate && (
+              <p className="text-gray-400 text-xs">No hold placed on this sample.</p>
+            )}
+          </div>
+
+          {/* Place hold form */}
+          {showPlaceHold && (
+            <div className="border-t px-4 py-3 bg-red-50 space-y-2">
+              <p className="text-xs font-semibold text-red-800">Place Hold</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Required break age to release</label>
+                  <select value={holdForm.requiredBreakAge} onChange={e => setHoldForm(f => ({ ...f, requiredBreakAge: e.target.value }))}
+                    className="border rounded px-2 py-1 text-xs w-full">
+                    <option value="">Select age</option>
+                    {['7day','14day','21day','28day','56day','90day','120day'].map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Hold placed date</label>
+                  <input type="date" value={holdForm.placedDate} onChange={e => setHoldForm(f => ({ ...f, placedDate: e.target.value }))}
+                    className="border rounded px-2 py-1 text-xs w-full" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Notes</label>
+                <input value={holdForm.notes} onChange={e => setHoldForm(f => ({ ...f, notes: e.target.value }))}
+                  className="border rounded px-2 py-1 text-xs w-full" placeholder="Reason for hold..." />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => saveHold({ holdActive: true, holdPlacedDate: holdForm.placedDate || new Date().toISOString().split('T')[0], holdRequiredBreakAge: holdForm.requiredBreakAge || null, holdNotes: holdForm.notes || null })}
+                  disabled={savingHold} className="bg-red-600 text-white text-xs px-3 py-1.5 rounded hover:bg-red-700 disabled:opacity-50">
+                  {savingHold ? 'Saving…' : 'Place Hold'}
+                </button>
+                <button onClick={() => setShowPlaceHold(false)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+              </div>
+            </div>
           )}
 
-          <a
-            href={`/api/samples/${sampleId}/template`}
-            className="bg-green-700 text-white px-4 py-2 rounded text-sm hover:bg-green-800"
-          >
-            Download Filled Template
-          </a>
+          {/* Break hold form */}
+          {showBreakHold && (
+            <div className="border-t px-4 py-3 bg-yellow-50 space-y-2">
+              <p className="text-xs font-semibold text-yellow-800">Break Hold — Document Government Approval</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Date approved</label>
+                  <input type="date" value={holdForm.brokenDate} onChange={e => setHoldForm(f => ({ ...f, brokenDate: e.target.value }))}
+                    className="border rounded px-2 py-1 text-xs w-full" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">Authorized by</label>
+                  <input value={holdForm.brokenBy} onChange={e => setHoldForm(f => ({ ...f, brokenBy: e.target.value }))}
+                    className="border rounded px-2 py-1 text-xs w-full" placeholder="Name / title" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Reason / basis for approval</label>
+                <input value={holdForm.brokenReason} onChange={e => setHoldForm(f => ({ ...f, brokenReason: e.target.value }))}
+                  className="border rounded px-2 py-1 text-xs w-full" placeholder="e.g. Approved per NAVFAC letter dated..." />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => saveHold({ holdActive: false, holdBrokenDate: holdForm.brokenDate || new Date().toISOString().split('T')[0], holdBrokenBy: holdForm.brokenBy || null, holdBrokenReason: holdForm.brokenReason || null })}
+                  disabled={savingHold} className="bg-yellow-600 text-white text-xs px-3 py-1.5 rounded hover:bg-yellow-700 disabled:opacity-50">
+                  {savingHold ? 'Saving…' : 'Record Hold Break'}
+                </button>
+                <button onClick={() => setShowBreakHold(false)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {sample.ticketFileUrl && (
           <div className="mt-6">
             <h2 className="font-bold mb-2">Attached Batch Ticket</h2>
-            <a href={sample.ticketFileUrl} target="_blank" className="text-blue-600 hover:underline text-sm">
+            <a href={`/api/samples/${sampleId}/ticket`} target="_blank" className="text-blue-600 hover:underline text-sm">
               View Ticket PDF
             </a>
           </div>

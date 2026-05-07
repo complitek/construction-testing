@@ -39,6 +39,17 @@ export async function POST(request: Request) {
   return NextResponse.json({ url: blob.url, fileName: file.name, uploadedAt })
 }
 
+export async function DELETE() {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const role = await getUserRole()
+  if (!role || !hasPermission(role, 'manage_users')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  await db.delete(appSettings).where(eq(appSettings.key, 'master_log_url'))
+  return NextResponse.json({ success: true })
+}
+
 export async function GET() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

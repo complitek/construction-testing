@@ -1,4 +1,5 @@
 export type Role =
+  | 'admin'
   | 'lab_tech'
   | 'lab_manager'
   | 'office_manager'
@@ -56,10 +57,48 @@ export interface SampleSet {
   breaks: BreakResults
   reportStatus: ReportStatus
   reportFileUrl: string | null
+  // Field tests
   temperature: number | null
   slump: string | null
   unitWeight: number | null
   airContent: number | null
+  astmC1611Flow: number | null
+  wcRatio: number | null
+  vsi: number | null
+  ambientTemp: number | null
+  // Location / placement
+  area: string | null
+  pfuLocation: string | null
+  wallPanelControlNo: string | null
+  structure: string | null
+  element: string | null
+  // Personnel / mix
+  sampledBy: string | null
+  sampleType: string | null
+  quantitySize: string | null
+  testedBy: string | null
+  sampleIdRange: string | null
+  // Volume / lot tracking
+  volumeCy: string | null
+  totalDailyVol: number | null
+  marineConcreteCumulative: number | null
+  marineConcreteLoNumber: string | null
+  // Acceptance
+  requiredCompStrength: number | null
+  compliance: string | null
+  retested: boolean
+  ncrIssued: boolean
+  dateSubmittedToGovt: string | null
+  comments: string | null
+  // Hold tracking
+  holdActive: boolean
+  holdPlacedDate: string | null
+  holdReleasedDate: string | null
+  holdBrokenDate: string | null
+  holdBrokenBy: string | null
+  holdBrokenReason: string | null
+  holdRequiredBreakAge: string | null
+  holdNotes: string | null
   createdBy: string
   createdAt: string
   updatedAt: string

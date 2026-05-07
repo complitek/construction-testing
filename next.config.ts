@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '50mb',
     },
   },
+  serverExternalPackages: [
+    '@react-pdf/renderer',
+    'pdf-lib',
+    'exceljs',
+    'canvas',
+    '@anthropic-ai/sdk',
+  ],
 };
 
 export default nextConfig;

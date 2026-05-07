@@ -26,13 +26,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { pourEventId, batchTicketNumber } = await request.json()
+  const body = await request.json()
+  const { pourEventId, batchTicketNumber } = body
   if (!pourEventId || !batchTicketNumber) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
   const [sample] = await db.insert(sampleSets).values({
-    pourEventId, batchTicketNumber, createdBy: userId,
+    pourEventId,
+    batchTicketNumber,
+    slump: body.slump ?? null,
+    astmC1611Flow: body.astmC1611Flow ?? null,
+    airContent: body.airContent ?? null,
+    unitWeight: body.unitWeight ?? null,
+    temperature: body.temperature ?? null,
+    createdBy: userId,
   }).returning()
 
   return NextResponse.json(sample, { status: 201 })

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { date, shift, spec, location, description, supplier, mixId } = body
+  const { date, shift, spec, location, description, supplier, mixId, definableFeature } = body
 
   if (!date || !shift || !spec || !location || !description || !supplier || !mixId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
 
   const [pour] = await db.insert(pourEvents).values({
     date, shift, spec, location, description, supplier, mixId,
+    definableFeature: definableFeature ?? null,
     createdBy: userId,
   }).returning()
 

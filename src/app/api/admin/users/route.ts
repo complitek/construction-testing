@@ -38,13 +38,18 @@ export async function POST(request: Request) {
     publicMetadata: { role: newRole },
   })
 
-  const [dbUser] = await db.insert(users).values({
-    id: crypto.randomUUID(),
-    clerkId: clerkUser.id,
-    role: newRole,
-    name,
-    email,
-  }).returning()
-
-  return NextResponse.json(dbUser, { status: 201 })
+  try {
+    const [dbUser] = await db.insert(users).values({
+      id: crypto.randomUUID(),
+      clerkId: clerkUser.id,
+      role: newRole,
+      name,
+      email,
+    }).returning()
+    return NextResponse.json(dbUser, { status: 201 })
+  } catch (err) {
+    await client.users.deleteUser(clerkUser.id)
+    console.error('DB insert failed after Clerk user creation, rolled back:', err)
+    return NextResponse.json({ error: 'User creation failed — please try again.' }, { status: 500 })
+  }
 }

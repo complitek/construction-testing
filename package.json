@@ -11,7 +11,13 @@
     "test:watch": "vitest",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
-    "db:push": "dotenv -e .env.local -- drizzle-kit push"
+    "db:push": "dotenv -e .env.local -- drizzle-kit push",
+    "import:log": "dotenv -e .env.local -- npx tsx src/scripts/import-master-log.ts",
+    "fix:air": "dotenv -e .env.local -- npx tsx src/scripts/fix-air-content.ts",
+    "diagnose:air": "dotenv -e .env.local -- npx tsx src/scripts/diagnose-air.ts",
+    "fix:bad-air": "dotenv -e .env.local -- npx tsx src/scripts/fix-bad-air.ts",
+    "diagnose:tickets": "dotenv -e .env.local -- npx tsx src/scripts/diagnose-ticket-matches.ts",
+    "dump:headers": "dotenv -e .env.local -- npx tsx src/scripts/dump-log-headers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
