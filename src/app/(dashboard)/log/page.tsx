@@ -155,16 +155,23 @@ export default function MasterLogPage() {
   const [deletingTicketId, setDeletingTicketId] = useState<string | null>(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
-  // Bulk ticket upload state
-  const [bulkFile, setBulkFile] = useState<File | null>(null)
+  // Bulk ticket upload state — queue of files, processed up to 3 in parallel.
+  type BulkResultData = {
+    totalTickets: number; matched: number; unmatched: number; flagged: number;
+    results: Array<{ batchTicketNumber: string | null; status: string; matchedBatchTicket: string | null; confidence: string }>
+  }
+  type BulkQueueItem = {
+    file: File
+    status: 'pending' | 'uploading' | 'done' | 'failed'
+    result?: BulkResultData
+    error?: string
+  }
+  const BULK_PARALLELISM = 3
+  const [bulkQueue, setBulkQueue] = useState<BulkQueueItem[]>([])
   const [bulkMonth, setBulkMonth] = useState('')
   const [bulkUploading, setBulkUploading] = useState(false)
   const [bulkInputKey, setBulkInputKey] = useState(0)
   const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null)
-  const [bulkResult, setBulkResult] = useState<{
-    totalTickets: number; matched: number; unmatched: number; flagged: number;
-    results: Array<{ batchTicketNumber: string | null; status: string; matchedBatchTicket: string | null; confidence: string }>
-  } | null>(null)
 
   useEffect(() => {
     fetch('/api/log').then(r => r.json()).then((data: LogRow[]) => {
@@ -409,35 +416,64 @@ export default function MasterLogPage() {
     }
   }
 
+  function addBulkFiles(files: FileList | File[] | null) {
+    if (!files) return
+    const arr = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
+    if (arr.length === 0) return
+    setBulkQueue(prev => [...prev, ...arr.map(f => ({ file: f, status: 'pending' as const }))])
+    setBulkInputKey(k => k + 1)  // reset input so same files can be re-selected later
+  }
+
+  function removeBulkFile(idx: number) {
+    setBulkQueue(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function clearBulkFinished() {
+    setBulkQueue(prev => prev.filter(q => q.status === 'pending' || q.status === 'uploading'))
+  }
+
   async function uploadBulkTickets() {
-    if (!bulkFile) return
+    // Snapshot the pending entries by file identity at start. Workers update
+    // queue rows by matching `q.file === file`, which is stable even if the
+    // user removes other rows mid-run.
+    const pendingFiles = bulkQueue.filter(q => q.status === 'pending').map(q => q.file)
+    if (pendingFiles.length === 0) return
     setBulkUploading(true)
-    setBulkResult(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', bulkFile)
-      if (bulkMonth) fd.append('month', bulkMonth)
-      const res = await fetch('/api/tickets/bulk-upload', { method: 'POST', body: fd })
-      if (!res.ok) {
-        const err = await res.json()
-        alert(err.error ?? 'Upload failed')
-        return
+
+    let cursor = 0
+    async function worker() {
+      while (cursor < pendingFiles.length) {
+        const file = pendingFiles[cursor++]
+        setBulkQueue(prev => prev.map(q => q.file === file ? { ...q, status: 'uploading' } : q))
+
+        try {
+          const fd = new FormData()
+          fd.append('file', file)
+          if (bulkMonth) fd.append('month', bulkMonth)
+          const res = await fetch('/api/tickets/bulk-upload', { method: 'POST', body: fd })
+          if (!res.ok) {
+            let msg = `Upload failed (${res.status})`
+            try { const err = await res.json(); msg = err.error ?? msg } catch {}
+            setBulkQueue(prev => prev.map(q => q.file === file ? { ...q, status: 'failed', error: msg } : q))
+            continue
+          }
+          const data: BulkResultData = await res.json()
+          setBulkQueue(prev => prev.map(q => q.file === file ? { ...q, status: 'done', result: data } : q))
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'unknown error'
+          setBulkQueue(prev => prev.map(q => q.file === file ? { ...q, status: 'failed', error: msg } : q))
+        }
       }
-      const data = await res.json()
-      setBulkResult(data)
-      setBulkFile(null)
-      setBulkInputKey(k => k + 1)  // reset file input so the same file can be re-selected
-      // Refresh log rows and ticket list
-      fetch('/api/log').then(r => r.json()).then((d: LogRow[]) => setRows(d))
-      fetch('/api/tickets/all').then(r => r.json()).then((d: TicketListItem[]) => {
-        setTicketItems(d)
-        setTicketsLoaded(true)
-      })
-    } catch (err) {
-      alert('Upload failed — ' + (err instanceof Error ? err.message : 'unknown error'))
-    } finally {
-      setBulkUploading(false)
     }
+
+    await Promise.all(Array.from({ length: Math.min(BULK_PARALLELISM, pendingFiles.length) }, worker))
+
+    setBulkUploading(false)
+    fetch('/api/log').then(r => r.json()).then((d: LogRow[]) => setRows(d))
+    fetch('/api/tickets/all').then(r => r.json()).then((d: TicketListItem[]) => {
+      setTicketItems(d)
+      setTicketsLoaded(true)
+    })
   }
 
   // ─── Summary bulk generation (DD5 PFU Tremie) ────────────────────────────
@@ -1473,83 +1509,136 @@ export default function MasterLogPage() {
                   onChange={e => setBulkMonth(e.target.value)}
                   className="border rounded px-3 py-1.5 text-sm"
                   placeholder="2025-11"
+                  disabled={bulkUploading}
                 />
               </div>
               <div className="flex-1 min-w-[260px]">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Scanned batch ticket PDF</label>
-                <div className="flex items-center gap-3">
-                  <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded px-4 py-1.5 text-sm transition-colors">
-                    {bulkFile ? bulkFile.name : 'Choose PDF…'}
-                    <input key={bulkInputKey} type="file" accept=".pdf" className="hidden"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) setBulkFile(f) }} />
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Scanned batch ticket PDFs (select one or many; up to {BULK_PARALLELISM} upload in parallel)
+                </label>
+                <div
+                  onDragOver={e => { e.preventDefault() }}
+                  onDrop={e => {
+                    e.preventDefault()
+                    if (bulkUploading) return
+                    addBulkFiles(e.dataTransfer.files)
+                  }}
+                  className="border-2 border-dashed border-gray-300 rounded px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-sm text-gray-600"
+                >
+                  <label className="cursor-pointer inline-flex items-center gap-2">
+                    <span className="bg-white border border-gray-300 rounded px-3 py-1 text-xs">Choose PDFs…</span>
+                    <input
+                      key={bulkInputKey}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      multiple
+                      className="hidden"
+                      disabled={bulkUploading}
+                      onChange={e => addBulkFiles(e.target.files)}
+                    />
+                    <span className="text-gray-500">or drag &amp; drop multiple files here</span>
                   </label>
-                  {bulkFile && <span className="text-xs text-gray-500">{(bulkFile.size / 1024 / 1024).toFixed(1)} MB</span>}
                 </div>
               </div>
               <button
                 onClick={uploadBulkTickets}
-                disabled={!bulkFile || bulkUploading}
+                disabled={bulkUploading || bulkQueue.filter(q => q.status === 'pending').length === 0}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
               >
-                {bulkUploading ? 'Processing… (this may take a few minutes)' : 'Upload & Match'}
+                {bulkUploading
+                  ? `Uploading… (${bulkQueue.filter(q => q.status === 'done' || q.status === 'failed').length}/${bulkQueue.length})`
+                  : `Upload All${bulkQueue.length > 0 ? ` (${bulkQueue.filter(q => q.status === 'pending').length})` : ''}`}
               </button>
             </div>
 
-            {bulkUploading && (
-              <div className="mt-4 flex items-center gap-3 text-sm text-blue-600">
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Reading batch tickets with AI — do not close this page…
-              </div>
-            )}
+            {bulkQueue.length > 0 && (() => {
+              const totals = bulkQueue.reduce((acc, q) => {
+                if (q.result) {
+                  acc.tickets += q.result.totalTickets
+                  acc.matched += q.result.matched
+                  acc.flagged += q.result.flagged
+                  acc.unmatched += q.result.unmatched
+                }
+                return acc
+              }, { tickets: 0, matched: 0, flagged: 0, unmatched: 0 })
+              const allDone = bulkQueue.every(q => q.status === 'done' || q.status === 'failed')
 
-            {bulkResult && (
-              <div className="mt-4 space-y-3">
-                <div className="flex gap-4 text-sm">
-                  <span className="font-semibold">{bulkResult.totalTickets} tickets found</span>
-                  <span className="text-green-700">&#10003; {bulkResult.matched} matched</span>
-                  {bulkResult.flagged > 0 && <span className="text-yellow-700">&#9888; {bulkResult.flagged} flagged (low confidence)</span>}
-                  {bulkResult.unmatched > 0 && <span className="text-red-700">&#10007; {bulkResult.unmatched} unmatched</span>}
-                </div>
-
-                {(bulkResult.flagged > 0 || bulkResult.unmatched > 0) && (
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-1">Tickets needing review:</p>
-                    <div className="border rounded overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 border-b">
-                          <tr>
-                            <th className="px-3 py-1.5 text-left">Extracted Ticket #</th>
-                            <th className="px-3 py-1.5 text-left">Status</th>
-                            <th className="px-3 py-1.5 text-left">AI Confidence</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {bulkResult.results
-                            .filter(r => r.status !== 'matched')
-                            .map((r, i) => (
-                              <tr key={i} className="border-b last:border-0">
-                                <td className="px-3 py-1.5 font-mono">{r.batchTicketNumber ?? '(not found)'}</td>
-                                <td className="px-3 py-1.5">
-                                  <span className={`px-2 py-0.5 rounded-full text-xs ${r.status === 'flagged' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                                    {r.status}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-1.5 text-gray-500">{r.confidence}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
+              return (
+                <div className="mt-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-gray-700">
+                      Upload queue ({bulkQueue.length} file{bulkQueue.length !== 1 ? 's' : ''})
+                    </p>
+                    {!bulkUploading && bulkQueue.some(q => q.status === 'done' || q.status === 'failed') && (
+                      <button
+                        onClick={clearBulkFinished}
+                        className="text-xs text-gray-500 hover:text-gray-800"
+                      >
+                        Clear finished
+                      </button>
+                    )}
                   </div>
-                )}
 
-                {bulkResult.matched === bulkResult.totalTickets && (
-                  <p className="text-sm text-green-700 font-medium">All tickets matched successfully.</p>
-                )}
-              </div>
+                  <div className="border rounded overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-3 py-1.5 text-left">File</th>
+                          <th className="px-3 py-1.5 text-left w-24">Size</th>
+                          <th className="px-3 py-1.5 text-left w-28">Status</th>
+                          <th className="px-3 py-1.5 text-left">Result</th>
+                          <th className="px-3 py-1.5 w-12"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkQueue.map((q, i) => (
+                          <tr key={i} className="border-b last:border-0">
+                            <td className="px-3 py-1.5 truncate max-w-[300px]" title={q.file.name}>{q.file.name}</td>
+                            <td className="px-3 py-1.5 text-gray-500">{(q.file.size / 1024 / 1024).toFixed(1)} MB</td>
+                            <td className="px-3 py-1.5">
+                              {q.status === 'pending'   && <span className="text-gray-500">Pending</span>}
+                              {q.status === 'uploading' && <span className="text-blue-600">Uploading…</span>}
+                              {q.status === 'done'      && <span className="text-green-700">&#10003; Done</span>}
+                              {q.status === 'failed'    && <span className="text-red-700">&#10007; Failed</span>}
+                            </td>
+                            <td className="px-3 py-1.5 text-gray-700">
+                              {q.result && (
+                                <span>
+                                  {q.result.totalTickets} tickets · <span className="text-green-700">{q.result.matched} matched</span>
+                                  {q.result.flagged   > 0 && <> · <span className="text-yellow-700">{q.result.flagged} flagged</span></>}
+                                  {q.result.unmatched > 0 && <> · <span className="text-red-700">{q.result.unmatched} unmatched</span></>}
+                                </span>
+                              )}
+                              {q.error && <span className="text-red-700">{q.error}</span>}
+                            </td>
+                            <td className="px-3 py-1.5 text-right">
+                              {q.status === 'pending' && !bulkUploading && (
+                                <button onClick={() => removeBulkFile(i)} className="text-gray-400 hover:text-red-600" title="Remove">×</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {allDone && totals.tickets > 0 && (
+                    <div className="mt-3 flex gap-4 text-sm">
+                      <span className="font-semibold">Totals:</span>
+                      <span>{totals.tickets} tickets</span>
+                      <span className="text-green-700">&#10003; {totals.matched} matched</span>
+                      {totals.flagged   > 0 && <span className="text-yellow-700">&#9888; {totals.flagged} flagged</span>}
+                      {totals.unmatched > 0 && <span className="text-red-700">&#10007; {totals.unmatched} unmatched</span>}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            {bulkUploading && (
+              <p className="mt-3 text-xs text-gray-500">
+                Reading batch tickets with AI — do not close this page until the queue finishes.
+              </p>
             )}
           </div>
 
