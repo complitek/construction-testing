@@ -83,6 +83,20 @@ function fv(v: string | number | null | undefined, suffix = ''): string {
   return v != null ? `${v}${suffix}` : ''
 }
 
+// "Samples Cast" count derived from the sample ID range string the importer
+// builds as "${first}–${last}" (en dash, occasionally hyphen). For sequential
+// cylinder IDs this gives the right count. Returns null when the range is
+// missing or unparseable so the cell renders blank instead of a wrong number.
+function samplesCastCount(range: string | null | undefined): number | null {
+  if (!range) return null
+  const m = range.match(/^\s*(\d+)\s*[–\-]\s*(\d+)\s*$/)
+  if (!m) return null
+  const first = parseInt(m[1], 10)
+  const last = parseInt(m[2], 10)
+  if (isNaN(first) || isNaN(last) || last < first) return null
+  return last - first + 1
+}
+
 function lightenHex(hex: string, factor: number): string {
   const h = hex.replace('#', '')
   if (h.length !== 6) return '#e5e7eb'
@@ -607,7 +621,7 @@ function ReportDocument({
             l1="Cast By:"
             v1={fv(data.sampledBy)}
             l2="Samples Cast:"
-            v2={fv(data.quantitySize)}
+            v2={fv(samplesCastCount(data.sampleIdRange))}
           />
           <InfoRow
             l1=""
@@ -623,8 +637,11 @@ function ReportDocument({
         {/* ---------------------------------------------------------------- */}
         <SectionHeader label="Material Tested" bgColor={sectionBgColor} />
         <View style={s.materialRow}>
+          {/* Plain ASCII X — Helvetica's built-in Type 1 font does not include
+              U+2713 (✓), so the checkmark rendered inconsistently across PDF
+              readers (sometimes blank). X renders identically everywhere. */}
           <Text style={s.materialText}>
-            {'Concrete [✓]   Grout [ ]   Mortar [ ]   ACIP grout [ ]'}
+            {'Concrete [X]   Grout [ ]   Mortar [ ]   ACIP grout [ ]'}
           </Text>
         </View>
 
