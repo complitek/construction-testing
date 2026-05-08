@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { summaryRecords, appSettings } from '@/lib/db/schema'
 import { and, eq, gte, lte, inArray } from 'drizzle-orm'
 import { renderReportPdf } from '@/lib/pdf/render-report'
+import { addOutlineBookmarks, buildDatePfuCellTitle, type BookmarkItem } from '@/lib/pdf/bookmarks'
 import { PDFDocument } from 'pdf-lib'
 import type { BreakResults } from '@/lib/types'
 
@@ -68,8 +69,17 @@ export async function GET(request: Request) {
   }
 
   const merged = await PDFDocument.create()
+  // Track first-page index AND every location string for each unique shift
+  // date so the bookmark title can list PFU + Cell coverage for the day.
+  const dateInfo = new Map<string, { firstPage: number; locations: Array<string | null> }>()
 
   for (const r of all) {
+    let info = dateInfo.get(r.shiftDate)
+    if (!info) {
+      info = { firstPage: merged.getPageCount(), locations: [] }
+      dateInfo.set(r.shiftDate, info)
+    }
+    info.locations.push(r.locationDescription)
     const buf = await renderReportPdf({
       date: r.shiftDate, shift: 'day',
       spec: r.spec ?? '', location: r.locationDescription ?? '',
@@ -109,13 +119,30 @@ export async function GET(request: Request) {
     }
   }
 
+  // One outline bookmark per unique shift date, sorted earliest first.
+  // Title combines the date with PFU + Cell coverage across that day's reports.
+  const bookmarks: BookmarkItem[] = [...dateInfo.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, info]) => ({
+      title: buildDatePfuCellTitle(date, info.locations),
+      pageIndex: info.firstPage,
+    }))
+  addOutlineBookmarks(merged, bookmarks)
+
   const pdfBytes = await merged.save()
-  const label = dateFrom ? dateFrom.substring(0, 7) : 'dd5'
+  const label = dateFrom ? dateFrom.substring(0, 7) : 'all'
+  // Filename mirrors the client-side `compressionResultsFilename` helper.
+  const monthMatch = label.match(/^(\d{4})-(\d{2})$/)
+  const fileName = monthMatch
+    ? `${monthMatch[1]}.${monthMatch[2]}_Compression_Results_DD5_PFU_Tremie.pdf`
+    : label === 'all'
+      ? 'Compression_Results_DD5_PFU_Tremie.pdf'
+      : `Compression_Results_DD5_PFU_Tremie_${label}.pdf`
 
   return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="compression-reports-dd5-${label}.pdf"`,
+      'Content-Disposition': `attachment; filename="${fileName}"`,
     },
   })
 }

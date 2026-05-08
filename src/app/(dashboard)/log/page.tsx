@@ -89,6 +89,16 @@ function getMonthKey(dateStr: string | null | undefined): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+// Filename for the merged-PDF bulk download. Users want month downloads
+// formatted as "YYYY.MM_Compression_Results_{kind}.pdf" — fall back to a
+// generic shape for "all" and "week" downloads.
+function compressionResultsFilename(label: string, kind: 'PW' | 'DD5_PFU_Tremie'): string {
+  const monthMatch = label.match(/^(\d{4})-(\d{2})$/)
+  if (monthMatch) return `${monthMatch[1]}.${monthMatch[2]}_Compression_Results_${kind}.pdf`
+  if (label === 'all') return `Compression_Results_${kind}.pdf`
+  return `Compression_Results_${kind}_${label}.pdf`
+}
+
 function formatMonthLabel(key: string): string {
   if (key === 'unknown') return 'Unknown Date'
   const [y, m] = key.split('-')
@@ -354,7 +364,7 @@ export default function MasterLogPage() {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `compression-reports-${label}.pdf`
+      a.download = compressionResultsFilename(label, 'PW')
       a.click()
       URL.revokeObjectURL(a.href)
     } finally {
@@ -594,7 +604,9 @@ export default function MasterLogPage() {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `compression-reports-dd5-${label}.${format === 'zip' ? 'zip' : 'pdf'}`
+      a.download = format === 'pdf'
+        ? compressionResultsFilename(label, 'DD5_PFU_Tremie')
+        : `compression-reports-dd5-${label}.zip`
       a.click()
       URL.revokeObjectURL(a.href)
     } finally {
@@ -1121,10 +1133,16 @@ export default function MasterLogPage() {
                 <p className="text-sm text-yellow-800">
                   <span className="font-semibold">{noTicket} of {rows.length} reports</span> have no batch ticket attached.
                 </p>
-                <button onClick={() => setFilterTicket('NO_TICKET')}
-                  className="text-xs text-yellow-700 border border-yellow-300 rounded px-2.5 py-1 hover:bg-yellow-100 transition-colors ml-4 shrink-0">
-                  Show only these
-                </button>
+                <div className="flex gap-2 ml-4 shrink-0">
+                  <button onClick={() => setFilterTicket('NO_TICKET')}
+                    className="text-xs text-yellow-700 border border-yellow-300 rounded px-2.5 py-1 hover:bg-yellow-100 transition-colors">
+                    Show only these
+                  </button>
+                  <Link href="/reports/unmatched"
+                    className="text-xs text-yellow-700 border border-yellow-300 rounded px-2.5 py-1 hover:bg-yellow-100 transition-colors">
+                    Printable list
+                  </Link>
+                </div>
               </div>
             )
           })()}
@@ -1507,6 +1525,10 @@ export default function MasterLogPage() {
                 <p className="text-sm text-yellow-800">
                   <span className="font-semibold">{noTicket} of {filteredDD5.length} reports</span> have no batch ticket scan attached.
                 </p>
+                <Link href="/reports/unmatched"
+                  className="text-xs text-yellow-700 border border-yellow-300 rounded px-2.5 py-1 hover:bg-yellow-100 transition-colors ml-4 shrink-0">
+                  Printable list
+                </Link>
               </div>
             )
           })()}

@@ -5,6 +5,7 @@ import { sampleSets, pourEvents, ticketRecords, appSettings } from '@/lib/db/sch
 import { eq, and, gte, lte, inArray } from 'drizzle-orm'
 import { renderReportPdf } from '@/lib/pdf/render-report'
 import { mergeReportWithTicket } from '@/lib/pdf/merge'
+import { addOutlineBookmarks, buildDatePfuCellTitle, type BookmarkItem } from '@/lib/pdf/bookmarks'
 import { PDFDocument } from 'pdf-lib'
 import type { BreakAge, BreakResults } from '@/lib/types'
 import { BREAK_AGES } from '@/lib/types'
@@ -67,10 +68,24 @@ export async function GET(request: Request) {
   }
 
   const merged = await PDFDocument.create()
+  // Track first-page index AND every location string seen for each unique
+  // date so the bookmark title can list the PFU + Cell coverage for the day.
+  const dateInfo = new Map<string, { firstPage: number; locations: Array<string | null> }>()
 
   for (const sampleRow of samples) {
     const pourRow = pourById.get(sampleRow.pourEventId)
     if (!pourRow) continue
+    let info = dateInfo.get(pourRow.date)
+    if (!info) {
+      info = { firstPage: merged.getPageCount(), locations: [] }
+      dateInfo.set(pourRow.date, info)
+    }
+    // pourEvents.location and .description both hold the "PFU X-Cell Y" string;
+    // include both in case one is more complete than the other.
+    info.locations.push(pourRow.location)
+    if (pourRow.description && pourRow.description !== pourRow.location) {
+      info.locations.push(pourRow.description)
+    }
 
     const breaks: BreakResults = {}
     const ageMap: Record<BreakAge, number | null> = {
@@ -127,13 +142,30 @@ export async function GET(request: Request) {
     pages.forEach(p => merged.addPage(p))
   }
 
+  // One outline bookmark per unique pour date, sorted earliest first.
+  // Title combines the date with PFU + Cell coverage across that day's reports.
+  const bookmarks: BookmarkItem[] = [...dateInfo.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, info]) => ({
+      title: buildDatePfuCellTitle(date, info.locations),
+      pageIndex: info.firstPage,
+    }))
+  addOutlineBookmarks(merged, bookmarks)
+
   const pdfBytes = await merged.save()
   const label = dateFrom ? dateFrom.substring(0, 7) : 'all'
+  // Filename mirrors the client-side `compressionResultsFilename` helper.
+  const monthMatch = label.match(/^(\d{4})-(\d{2})$/)
+  const fileName = monthMatch
+    ? `${monthMatch[1]}.${monthMatch[2]}_Compression_Results_PW.pdf`
+    : label === 'all'
+      ? 'Compression_Results_PW.pdf'
+      : `Compression_Results_PW_${label}.pdf`
 
   return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="compression-reports-${label}.pdf"`,
+      'Content-Disposition': `attachment; filename="${fileName}"`,
     },
   })
 }
