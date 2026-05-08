@@ -157,6 +157,7 @@ export default function MasterLogPage() {
   const [editingTicket, setEditingTicket] = useState<{ id: string; batch: string; date: string } | null>(null)
   const [savingTicketEdit, setSavingTicketEdit] = useState(false)
   const [showReviewOnly, setShowReviewOnly] = useState(false)
+  const [reextracting, setReextracting] = useState(false)
 
   // Bulk ticket upload state — queue of files, processed up to 3 in parallel.
   type BulkResultData = {
@@ -416,6 +417,44 @@ export default function MasterLogPage() {
     const now = new Date().getFullYear()
     if (isNaN(year) || year < 2024 || year > now + 1) return true
     return false
+  }
+
+  async function runReextract(mode: 'unreadable' | 'p209', confirmMessage: string) {
+    if (reextracting) return
+    if (!confirm(confirmMessage)) return
+    setReextracting(true)
+    try {
+      const res = await fetch('/api/tickets/reextract-unreadable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      })
+      if (!res.ok) {
+        alert(`Re-extract failed (${res.status})`)
+        return
+      }
+      const data: { total: number; recovered: number; stillNull: number; matched: number; fetchFailed: number } = await res.json()
+      alert(
+        `Re-extracted ${data.total} tickets:\n` +
+        `• ${data.recovered} now have a batch number\n` +
+        `• ${data.matched} were linked to a compression report\n` +
+        `• ${data.stillNull} still unreadable\n` +
+        (data.fetchFailed > 0 ? `• ${data.fetchFailed} couldn't be fetched from storage\n` : '')
+      )
+      const fresh: TicketListItem[] = await fetch('/api/tickets/all').then(r => r.json())
+      setTicketItems(fresh)
+      fetch('/api/log').then(r => r.json()).then((d: LogRow[]) => setRows(d))
+    } finally {
+      setReextracting(false)
+    }
+  }
+
+  async function reextractUnreadable() {
+    return runReextract('unreadable', 'Re-run AI extraction on every unreadable ticket? This pulls each PDF from storage and re-asks Anthropic — typically 1-2 minutes for ~100 tickets.')
+  }
+
+  async function reextractP209() {
+    return runReextract('p209', 'Re-extract every ticket where the AI grabbed the project code "P-209" instead of the real batch number? Will detach any stale links and re-run extraction with the corrected prompt.')
   }
 
   async function saveTicketEdit() {
@@ -882,7 +921,13 @@ export default function MasterLogPage() {
                                     {d(row.description || row.pfuLocation)}
                                   </td>
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap">
-                                    <Link href={`/samples/${row.sampleId}`} className="text-blue-600 hover:underline font-mono">
+                                    <Link
+                                      href={`/samples/${row.sampleId}`}
+                                      className={row.ticketFileUrl
+                                        ? 'inline-block bg-green-100 hover:bg-green-200 text-green-800 font-mono font-semibold px-2 py-0.5 rounded'
+                                        : 'text-blue-600 hover:underline font-mono'}
+                                      title={row.ticketFileUrl ? 'Batch ticket scan attached' : 'No batch ticket scan'}
+                                    >
                                       {row.batchTicketNumber}
                                     </Link>
                                   </td>
@@ -1216,6 +1261,7 @@ export default function MasterLogPage() {
                   const failCount = monthRows.filter(r => r.compliance === 'NO').length
                   const pendingCount = monthRows.filter(r => !r.compliance).length
                   const ticketCount = monthRows.filter(r => r.ticketFileUrl).length
+                  const noTicketCount = monthRows.length - ticketCount
                   return (
                     <div key={mk} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                       <div className="flex items-center">
@@ -1226,7 +1272,16 @@ export default function MasterLogPage() {
                           {passCount > 0 && <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5 font-medium">{passCount} PASS</span>}
                           {failCount > 0 && <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 font-medium">{failCount} FAIL</span>}
                           {pendingCount > 0 && <span className="text-xs text-gray-400">{pendingCount} pending</span>}
-                          <span className="text-xs text-gray-500">Tickets: <span className="font-medium text-gray-700">{ticketCount}/{monthRows.length}</span></span>
+                          {ticketCount > 0 && (
+                            <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5 font-medium" title="Reports with batch ticket scan attached">
+                              {ticketCount} matched
+                            </span>
+                          )}
+                          {noTicketCount > 0 && (
+                            <span className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-medium" title="Reports missing a batch ticket scan">
+                              {noTicketCount} no ticket
+                            </span>
+                          )}
                           <span className="ml-auto text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
                         </button>
                         <button onClick={() => downloadBulkReports({ month: mk })} disabled={bulkGenerating || bulkPrinting}
@@ -1271,7 +1326,13 @@ export default function MasterLogPage() {
                                   <td className="px-2 py-1.5 border-b max-w-[200px] truncate" title={row.description ?? row.location}>{row.description || row.location || '—'}</td>
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap text-gray-600">{d(row.spec)}</td>
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap font-mono">
-                                    <Link href={`/samples/${row.sampleId}`} className="text-blue-600 hover:underline">{row.batchTicketNumber}</Link>
+                                    <Link
+                                      href={`/samples/${row.sampleId}`}
+                                      className={row.ticketFileUrl
+                                        ? 'inline-block bg-green-100 hover:bg-green-200 text-green-800 font-semibold px-2 py-0.5 rounded'
+                                        : 'text-blue-600 hover:underline'}
+                                      title={row.ticketFileUrl ? 'Batch ticket scan attached' : 'No batch ticket scan'}
+                                    >{row.batchTicketNumber}</Link>
                                   </td>
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap font-mono text-gray-600">{d(row.mixId)}</td>
                                   <td className="px-2 py-1.5 border-b text-center">{d(row.slump)}</td>
@@ -1469,6 +1530,8 @@ export default function MasterLogPage() {
                   const passCount = monthRows.filter(r => r.complianceStrength?.toUpperCase().includes('YES')).length
                   const failCount = monthRows.filter(r => r.complianceStrength?.toUpperCase().includes('NO')).length
                   const pendingCount = monthRows.filter(r => !r.complianceStrength).length
+                  const ticketCount = monthRows.filter(r => r.ticketFileUrl).length
+                  const noTicketCount = monthRows.length - ticketCount
                   return (
                     <div key={mk} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                       <button onClick={() => toggleDD5Month(mk)}
@@ -1478,6 +1541,16 @@ export default function MasterLogPage() {
                         {passCount > 0 && <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5 font-medium">{passCount} PASS</span>}
                         {failCount > 0 && <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 font-medium">{failCount} FAIL</span>}
                         {pendingCount > 0 && <span className="text-xs text-gray-400">{pendingCount} pending</span>}
+                        {ticketCount > 0 && (
+                          <span className="text-xs bg-green-100 text-green-700 rounded px-1.5 py-0.5 font-medium" title="Reports with batch ticket scan attached">
+                            {ticketCount} matched
+                          </span>
+                        )}
+                        {noTicketCount > 0 && (
+                          <span className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-medium" title="Reports missing a batch ticket scan">
+                            {noTicketCount} no ticket
+                          </span>
+                        )}
                         <span className="ml-auto text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
                       </button>
                       {isOpen && (
@@ -1508,7 +1581,18 @@ export default function MasterLogPage() {
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap font-medium">{fmtDate(row.shiftDate)}</td>
                                   <td className="px-2 py-1.5 border-b max-w-[200px] truncate" title={row.locationDescription ?? undefined}>{row.locationDescription ?? '—'}</td>
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap text-gray-600">{row.spec ?? '—'}</td>
-                                  <td className="px-2 py-1.5 border-b whitespace-nowrap font-mono">{row.batchTicketNumber ?? '—'}</td>
+                                  <td className="px-2 py-1.5 border-b whitespace-nowrap font-mono">
+                                    {row.batchTicketNumber ? (
+                                      row.ticketFileUrl ? (
+                                        <span
+                                          className="inline-block bg-green-100 text-green-800 font-semibold px-2 py-0.5 rounded"
+                                          title="Batch ticket scan attached"
+                                        >{row.batchTicketNumber}</span>
+                                      ) : (
+                                        <span>{row.batchTicketNumber}</span>
+                                      )
+                                    ) : '—'}
+                                  </td>
                                   <td className="px-2 py-1.5 border-b whitespace-nowrap font-mono text-gray-600">{row.mixId ?? '—'}</td>
                                   <td className="px-2 py-1.5 border-b text-center">{row.slump ?? '—'}</td>
                                   <td className="px-2 py-1.5 border-b text-center">{row.airContent != null ? `${Number(row.airContent).toFixed(1)}%` : '—'}</td>
@@ -1771,6 +1855,7 @@ export default function MasterLogPage() {
               : []
 
             const noNumberCount = ticketItems.filter(t => !t.batchTicketNumber).length
+            const p209Count = ticketItems.filter(t => t.batchTicketNumber && /^p[\s\-_]?209$/i.test(t.batchTicketNumber.trim())).length
 
             return (
               <>
@@ -1785,12 +1870,26 @@ export default function MasterLogPage() {
                   </div>
                   <div className="flex gap-2">
                     {noNumberCount > 0 && (
-                      <button onClick={() => bulkDeleteTickets('no_number')} disabled={bulkDeleting}
+                      <button onClick={reextractUnreadable} disabled={reextracting || bulkDeleting}
+                        title="Re-run AI extraction on every unreadable ticket — uses the existing PDFs in storage, no re-upload needed."
+                        className="text-xs px-3 py-1.5 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 disabled:opacity-50 transition-colors">
+                        {reextracting ? 'Re-extracting…' : `Re-extract unreadable (${noNumberCount})`}
+                      </button>
+                    )}
+                    {p209Count > 0 && (
+                      <button onClick={reextractP209} disabled={reextracting || bulkDeleting}
+                        title='Tickets where the AI grabbed "P-209" (the project code) instead of the real ticket number. Re-runs extraction with the corrected prompt.'
+                        className="text-xs px-3 py-1.5 border border-purple-300 text-purple-700 rounded hover:bg-purple-50 disabled:opacity-50 transition-colors">
+                        {reextracting ? 'Re-extracting…' : `Re-extract P-209 misreads (${p209Count})`}
+                      </button>
+                    )}
+                    {noNumberCount > 0 && (
+                      <button onClick={() => bulkDeleteTickets('no_number')} disabled={bulkDeleting || reextracting}
                         className="text-xs px-3 py-1.5 border border-yellow-300 text-yellow-700 rounded hover:bg-yellow-50 disabled:opacity-50 transition-colors">
                         Delete unreadable ({noNumberCount})
                       </button>
                     )}
-                    <button onClick={() => bulkDeleteTickets('all')} disabled={bulkDeleting}
+                    <button onClick={() => bulkDeleteTickets('all')} disabled={bulkDeleting || reextracting}
                       className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 transition-colors">
                       Delete all
                     </button>

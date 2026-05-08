@@ -36,6 +36,29 @@ export async function GET(request: Request) {
     samples = await db.select().from(sampleSets)
   }
 
+  // Pre-fetch every pour event we'll need so the report loop is O(1) and the
+  // sort below has a date for each sample.
+  const pourIds = [...new Set(samples.map(s => s.pourEventId))]
+  const pourRows = pourIds.length > 0
+    ? await db.select().from(pourEvents).where(inArray(pourEvents.id, pourIds))
+    : []
+  const pourById = new Map(pourRows.map(p => [p.id, p]))
+
+  // Sort: earliest pour date first, then by batch ticket number (numeric if both
+  // are pure digits, otherwise lexicographic).
+  const norm = (s: string | null) => (s ?? '').replace(/\s/g, '').replace(/^0+/, '')
+  samples.sort((a, b) => {
+    const da = pourById.get(a.pourEventId)?.date ?? ''
+    const db_ = pourById.get(b.pourEventId)?.date ?? ''
+    if (da !== db_) return da.localeCompare(db_)
+    const an = norm(a.batchTicketNumber)
+    const bn = norm(b.batchTicketNumber)
+    const ai = /^\d+$/.test(an) ? parseInt(an, 10) : NaN
+    const bi = /^\d+$/.test(bn) ? parseInt(bn, 10) : NaN
+    if (!isNaN(ai) && !isNaN(bi)) return ai - bi
+    return an.localeCompare(bn)
+  })
+
   // Fetch project settings once for all reports
   const settingRows = await db.select().from(appSettings)
     .where(inArray(appSettings.key, ['project_name', 'project_location', 'company_name', 'contract_number', 'report_prepared_by', 'logo_url', 'brand_color']))
@@ -53,7 +76,7 @@ export async function GET(request: Request) {
   const files: Array<{ name: string; data: Uint8Array }> = []
 
   for (const sampleRow of samples) {
-    const [pourRow] = await db.select().from(pourEvents).where(eq(pourEvents.id, sampleRow.pourEventId))
+    const pourRow = pourById.get(sampleRow.pourEventId)
     if (!pourRow) continue
 
     const breaks: BreakResults = {}

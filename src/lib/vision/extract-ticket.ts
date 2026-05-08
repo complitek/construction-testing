@@ -5,7 +5,12 @@ const client = new Anthropic()
 
 const EXTRACT_PROMPT = `You are reading a concrete batch ticket from a construction project.
 Extract the following fields and return ONLY a JSON object with these exact keys:
-- batchTicketNumber: the batch/ticket number printed on the ticket (string or null)
+- batchTicketNumber: the unique sequential ticket/batch number printed on this specific delivery ticket (string or null). It is usually labeled "Ticket #", "Batch #", "Batch Ticket #", "Ticket No.", or similar, and is typically a 4-7 digit number that is unique to this delivery. DO NOT use:
+  - The contract or project number (e.g. "P-209", "P209", "P-202") — that's the project, not a ticket
+  - The mix design ID (e.g. "HD5KMDD1") — that's the mix, not a ticket
+  - The truck #, driver #, sequence #, or load ID — those are not the batch ticket number
+  - Any number that appears the same across many tickets
+  If the ticket-specific number is not clearly visible, return null.
 - date: the date of the batch in ISO format YYYY-MM-DD (string or null)
 - supplier: the concrete supplier or plant name (string or null)
 - mixId: the mix design ID, mix number, or design strength code (string or null)
@@ -13,14 +18,31 @@ Extract the following fields and return ONLY a JSON object with these exact keys
 
 Return ONLY the JSON object. No explanation, no markdown.`
 
+// Project-level identifiers we know appear on these tickets and that the AI
+// occasionally confuses for the batch ticket number. Anything matching these
+// is forced back to null so we don't store a wrong answer.
+const PROJECT_CODE_RE = /^p[\s\-_]?2(09|02|10)$/i
+const MIX_DESIGN_RE = /^hd5kmdd1$/i
+
 function parseExtractResponse(raw: string): ExtractedTicketData {
   // Strip markdown code fences if the model wraps its response
   const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  let data: ExtractedTicketData
   try {
-    return JSON.parse(text) as ExtractedTicketData
+    data = JSON.parse(text) as ExtractedTicketData
   } catch {
     return { batchTicketNumber: null, date: null, supplier: null, mixId: null, confidence: 'low' }
   }
+  // Reject known not-a-ticket-number answers — better to mark unreadable than
+  // to store the project code as if it were a real batch number.
+  if (data.batchTicketNumber) {
+    const trimmed = data.batchTicketNumber.trim()
+    if (PROJECT_CODE_RE.test(trimmed) || MIX_DESIGN_RE.test(trimmed)) {
+      data.batchTicketNumber = null
+      data.confidence = 'low'
+    }
+  }
+  return data
 }
 
 export async function extractTicketData(

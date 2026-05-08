@@ -39,6 +39,18 @@ export async function GET(request: Request) {
 
   const all = await db.select().from(summaryRecords).where(and(...conditions))
 
+  // Sort: earliest shift date first, then by batch ticket number.
+  const norm = (s: string | null) => (s ?? '').replace(/\s/g, '').replace(/^0+/, '')
+  all.sort((a, b) => {
+    if (a.shiftDate !== b.shiftDate) return a.shiftDate.localeCompare(b.shiftDate)
+    const an = norm(a.batchTicketNumber)
+    const bn = norm(b.batchTicketNumber)
+    const ai = /^\d+$/.test(an) ? parseInt(an, 10) : NaN
+    const bi = /^\d+$/.test(bn) ? parseInt(bn, 10) : NaN
+    if (!isNaN(ai) && !isNaN(bi)) return ai - bi
+    return an.localeCompare(bn)
+  })
+
   const settingRows = await db.select().from(appSettings)
     .where(inArray(appSettings.key, ['project_name', 'project_location', 'company_name', 'contract_number', 'report_prepared_by', 'logo_url', 'brand_color']))
   const sm = Object.fromEntries(settingRows.map(s => [s.key, s.value]))
