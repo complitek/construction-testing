@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
 import { summaryRecords, appSettings } from '@/lib/db/schema'
-import { and, gte, lte, inArray } from 'drizzle-orm'
+import { and, eq, gte, lte, inArray } from 'drizzle-orm'
 import { renderReportPdf } from '@/lib/pdf/render-report'
 import { PDFDocument } from 'pdf-lib'
 import type { BreakResults } from '@/lib/types'
@@ -31,7 +31,12 @@ export async function GET(request: Request) {
   const dateFrom = url.searchParams.get('dateFrom')
   const dateTo = url.searchParams.get('dateTo')
 
-  const conditions = [gte(summaryRecords.shiftDate, '2025-11-10')]
+  // DD5 PFU Tremie = mixId HD5KMDD1 only. Without this filter, bulk-print
+  // would pull every Summary-sheet row (765+ non-Tremie mixes also live here).
+  const conditions = [
+    eq(summaryRecords.mixId, 'HD5KMDD1'),
+    gte(summaryRecords.shiftDate, '2025-11-10'),
+  ]
   if (dateFrom) conditions.push(gte(summaryRecords.shiftDate, dateFrom))
   if (dateTo)   conditions.push(lte(summaryRecords.shiftDate, dateTo))
 
