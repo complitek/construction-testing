@@ -33,15 +33,13 @@ export function addOutlineBookmarks(doc: PDFDocument, items: BookmarkItem[]): vo
     if (it.pageIndex < 0 || it.pageIndex >= pages.length) continue
     const pageRef = pages[it.pageIndex].ref
 
-    const dictEntries: Record<string, unknown> = {
+    ctx.assign(itemRefs[i], ctx.obj({
       Title: PDFString.of(it.title),
       Parent: outlinesRef,
       Dest: ctx.obj([pageRef, PDFName.of('Fit')]),
-    }
-    if (i > 0) dictEntries.Prev = itemRefs[i - 1]
-    if (i < items.length - 1) dictEntries.Next = itemRefs[i + 1]
-
-    ctx.assign(itemRefs[i], ctx.obj(dictEntries))
+      ...(i > 0 ? { Prev: itemRefs[i - 1] } : {}),
+      ...(i < items.length - 1 ? { Next: itemRefs[i + 1] } : {}),
+    }))
   }
 
   ctx.assign(outlinesRef, ctx.obj({

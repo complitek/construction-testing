@@ -55,7 +55,7 @@ export async function GET() {
     ))
 
   const pw: UnmatchedReport[] = pwRows.map(r => ({
-    kind: 'PW',
+    kind: 'PW' as const,
     id: r.id,
     date: r.date,
     location: r.description ?? r.location,
@@ -64,7 +64,7 @@ export async function GET() {
   })).sort((a, b) => a.date.localeCompare(b.date))
 
   const dd5: UnmatchedReport[] = dd5Rows.map(r => ({
-    kind: 'DD5',
+    kind: 'DD5' as const,
     id: r.id,
     date: r.date,
     location: r.location,
