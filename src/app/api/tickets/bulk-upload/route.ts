@@ -175,7 +175,10 @@ export async function POST(request: Request) {
   async function putWithRetry(path: string, bytes: Buffer, attempts = 3) {
     for (let i = 0; i < attempts; i++) {
       try {
-        return await put(path, bytes, { access: 'private', contentType: 'application/pdf' })
+        // allowOverwrite handles the case where attempt N-1 succeeded server-
+        // side but the response never made it back — we'd otherwise 500 with
+        // "blob already exists" on retry over a flaky network.
+        return await put(path, bytes, { access: 'private', contentType: 'application/pdf', allowOverwrite: true })
       } catch (e) {
         if (i === attempts - 1) throw e
         await new Promise(r => setTimeout(r, 300 * (i + 1)))

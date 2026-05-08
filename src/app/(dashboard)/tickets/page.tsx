@@ -29,6 +29,43 @@ export default function BatchTicketsPage() {
   const [loading, setLoading] = useState(true)
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set())
   const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null)
+  const [showUnreadableOnly, setShowUnreadableOnly] = useState(false)
+  const [editing, setEditing] = useState<{ id: string; batch: string; date: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  function startEdit(t: TicketListItem) {
+    setEditing({
+      id: t.id,
+      batch: t.batchTicketNumber ?? '',
+      date: t.ticketDate ?? '',
+    })
+  }
+
+  async function saveEdit() {
+    if (!editing) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tickets/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchTicketNumber: editing.batch.trim() === '' ? null : editing.batch.trim(),
+          ticketDate: editing.date.trim() === '' ? null : editing.date.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error ?? `Save failed (${res.status})`)
+        return
+      }
+      // Refresh list
+      const data: TicketListItem[] = await fetch('/api/tickets/all').then(r => r.json())
+      setItems(data)
+      setEditing(null)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function downloadMonth(ym: string) {
     setDownloadingMonth(ym)
@@ -65,15 +102,21 @@ export default function BatchTicketsPage() {
       })
   }, [])
 
+  // Filter to unreadable (no batch #) when toggle is on.
+  const filteredItems = showUnreadableOnly
+    ? items.filter(t => !t.batchTicketNumber || t.batchTicketNumber === 'null' || t.batchTicketNumber.trim() === '')
+    : items
+
   // Group by ticket date (AI-extracted from PDF) → falls back to pour date or upload date.
   const grouped: Map<string, TicketListItem[]> = new Map()
-  for (const item of items) {
+  for (const item of filteredItems) {
     const d = item.ticketDate ?? item.pourDate ?? item.createdAt.slice(0, 10)
     const ym = d.slice(0, 7)
     if (!grouped.has(ym)) grouped.set(ym, [])
     grouped.get(ym)!.push(item)
   }
   const months = [...grouped.keys()].sort((a, b) => b.localeCompare(a))
+  const unreadableCount = items.filter(t => !t.batchTicketNumber || t.batchTicketNumber === 'null' || t.batchTicketNumber.trim() === '').length
 
   function toggleMonth(ym: string) {
     setOpenMonths(prev => {
@@ -112,7 +155,21 @@ export default function BatchTicketsPage() {
             {totalUnmatched > 0 && (
               <> &middot; <span className="text-red-600">{totalUnmatched} unmatched</span></>
             )}
+            {unreadableCount > 0 && (
+              <> &middot; <span className="text-orange-600">{unreadableCount} unreadable</span></>
+            )}
           </p>
+          {unreadableCount > 0 && (
+            <label className="inline-flex items-center gap-2 mt-2 text-xs text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showUnreadableOnly}
+                onChange={e => setShowUnreadableOnly(e.target.checked)}
+                className="rounded"
+              />
+              Show only unreadable tickets ({unreadableCount})
+            </label>
+          )}
         </div>
         <div className="flex gap-2">
           <Link
@@ -176,59 +233,121 @@ export default function BatchTicketsPage() {
                   {/* Ticket rows */}
                   {isOpen && (
                     <div className="divide-y divide-gray-100">
-                      {tickets.map(ticket => (
-                        <div key={ticket.id} className="flex items-center gap-4 px-5 py-3 hover:bg-blue-50 transition-colors">
-                          {/* Ticket # */}
-                          <div className="w-32 shrink-0">
-                            {ticket.sampleSetId ? (
-                              <a
-                                href={`/api/samples/${ticket.sampleSetId}/report`}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Download compression report (batch ticket attached as last page)"
-                                className="font-mono text-sm font-medium text-blue-600 hover:underline"
-                              >
-                                {ticket.batchTicketNumber ?? '(unknown)'}
-                              </a>
-                            ) : (
-                              <span className="font-mono text-sm font-medium text-gray-700">
-                                {ticket.batchTicketNumber ?? '(unknown)'}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Pour date */}
-                          <div className="w-20 shrink-0 text-sm text-gray-500">
-                            {fmtDate(ticket.pourDate)}
-                          </div>
-
-                          {/* Location */}
-                          <div className="flex-1 text-sm text-gray-700 truncate min-w-0" title={ticket.pourLocation ?? undefined}>
-                            {ticket.pourLocation ?? ticket.pourDescription ?? '—'}
-                          </div>
-
-                          {/* Match status */}
-                          <div className="w-28 shrink-0">
-                            {ticket.matchStatus ? (
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.matchStatus] ?? 'bg-gray-100 text-gray-500'}`}>
-                                {STATUS_LABEL[ticket.matchStatus] ?? ticket.matchStatus}
-                              </span>
-                            ) : (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Unmatched</span>
-                            )}
-                          </div>
-
-                          {/* View button */}
-                          <a
-                            href={`/api/tickets/${ticket.id}/file`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="shrink-0 text-xs text-blue-600 hover:underline border border-blue-200 rounded px-2.5 py-1 hover:bg-blue-50 transition-colors"
+                      {tickets.map(ticket => {
+                        const isUnreadable = !ticket.batchTicketNumber || ticket.batchTicketNumber === 'null' || ticket.batchTicketNumber.trim() === ''
+                        const isEditing = editing?.id === ticket.id
+                        return (
+                          <div
+                            key={ticket.id}
+                            className={`flex items-center gap-4 px-5 py-3 transition-colors ${isUnreadable ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-blue-50'}`}
                           >
-                            View PDF
-                          </a>
-                        </div>
-                      ))}
+                            {isEditing ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={editing.batch}
+                                  onChange={e => setEditing({ ...editing, batch: e.target.value })}
+                                  placeholder="Ticket #"
+                                  className="w-32 shrink-0 border rounded px-2 py-1 font-mono text-sm"
+                                  autoFocus
+                                />
+                                <input
+                                  type="date"
+                                  value={editing.date}
+                                  onChange={e => setEditing({ ...editing, date: e.target.value })}
+                                  className="w-36 shrink-0 border rounded px-2 py-1 text-sm"
+                                />
+                                <div className="flex-1 text-xs text-gray-500 truncate min-w-0">
+                                  {ticket.pourLocation ?? ticket.pourDescription ?? '—'}
+                                </div>
+                                <button
+                                  onClick={saveEdit}
+                                  disabled={saving}
+                                  className="shrink-0 text-xs bg-green-600 hover:bg-green-700 text-white rounded px-3 py-1 disabled:opacity-50"
+                                >
+                                  {saving ? 'Saving…' : 'Save'}
+                                </button>
+                                <button
+                                  onClick={() => setEditing(null)}
+                                  disabled={saving}
+                                  className="shrink-0 text-xs text-gray-600 hover:text-gray-900 px-2 py-1"
+                                >
+                                  Cancel
+                                </button>
+                                <a
+                                  href={`/api/tickets/${ticket.id}/file`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="shrink-0 text-xs text-blue-600 hover:underline border border-blue-200 rounded px-2.5 py-1 hover:bg-blue-50"
+                                >
+                                  View PDF
+                                </a>
+                              </>
+                            ) : (
+                              <>
+                                {/* Ticket # */}
+                                <div className="w-32 shrink-0">
+                                  {isUnreadable ? (
+                                    <span className="font-mono text-sm font-medium text-orange-700 italic">unreadable</span>
+                                  ) : ticket.sampleSetId ? (
+                                    <a
+                                      href={`/api/samples/${ticket.sampleSetId}/report`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title="Download compression report (batch ticket attached as last page)"
+                                      className="font-mono text-sm font-medium text-blue-600 hover:underline"
+                                    >
+                                      {ticket.batchTicketNumber}
+                                    </a>
+                                  ) : (
+                                    <span className="font-mono text-sm font-medium text-gray-700">
+                                      {ticket.batchTicketNumber}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Ticket date (AI-extracted) */}
+                                <div className="w-20 shrink-0 text-sm text-gray-500">
+                                  {fmtDate(ticket.ticketDate ?? ticket.pourDate)}
+                                </div>
+
+                                {/* Location */}
+                                <div className="flex-1 text-sm text-gray-700 truncate min-w-0" title={ticket.pourLocation ?? undefined}>
+                                  {ticket.pourLocation ?? ticket.pourDescription ?? '—'}
+                                </div>
+
+                                {/* Match status */}
+                                <div className="w-28 shrink-0">
+                                  {ticket.matchStatus ? (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_STYLE[ticket.matchStatus] ?? 'bg-gray-100 text-gray-500'}`}>
+                                      {STATUS_LABEL[ticket.matchStatus] ?? ticket.matchStatus}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Unmatched</span>
+                                  )}
+                                </div>
+
+                                <button
+                                  onClick={() => startEdit(ticket)}
+                                  className="shrink-0 text-xs text-gray-600 hover:text-blue-600 border border-gray-200 hover:border-blue-300 rounded px-2.5 py-1 hover:bg-blue-50 transition-colors"
+                                  title="Edit ticket # and date"
+                                >
+                                  Edit
+                                </button>
+
+                                <a
+                                  href={`/api/tickets/${ticket.id}/file`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="shrink-0 text-xs text-blue-600 hover:underline border border-blue-200 rounded px-2.5 py-1 hover:bg-blue-50 transition-colors"
+                                >
+                                  View PDF
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

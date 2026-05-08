@@ -154,6 +154,9 @@ export default function MasterLogPage() {
   const [linkSaving, setLinkSaving] = useState(false)
   const [deletingTicketId, setDeletingTicketId] = useState<string | null>(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [editingTicket, setEditingTicket] = useState<{ id: string; batch: string; date: string } | null>(null)
+  const [savingTicketEdit, setSavingTicketEdit] = useState(false)
+  const [showReviewOnly, setShowReviewOnly] = useState(false)
 
   // Bulk ticket upload state — queue of files, processed up to 3 in parallel.
   type BulkResultData = {
@@ -400,6 +403,48 @@ export default function MasterLogPage() {
     } finally { setBulkDeleting(false) }
   }
 
+  // A ticket needs human review if (a) the AI couldn't read its batch #, or
+  // (b) the extracted date falls outside a sane construction-project window.
+  // Project shifts are 2025+, so anything older than 2024 or after next year
+  // is almost certainly a misread (e.g. AI seeing "11" as "2011").
+  function ticketNeedsReview(t: TicketListItem): boolean {
+    const noBatch = !t.batchTicketNumber || t.batchTicketNumber === 'null' || t.batchTicketNumber.trim() === ''
+    if (noBatch) return true
+    const d = t.ticketDate
+    if (!d) return true
+    const year = parseInt(d.slice(0, 4), 10)
+    const now = new Date().getFullYear()
+    if (isNaN(year) || year < 2024 || year > now + 1) return true
+    return false
+  }
+
+  async function saveTicketEdit() {
+    if (!editingTicket) return
+    setSavingTicketEdit(true)
+    try {
+      const res = await fetch(`/api/tickets/${editingTicket.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchTicketNumber: editingTicket.batch.trim() === '' ? null : editingTicket.batch.trim(),
+          ticketDate: editingTicket.date.trim() === '' ? null : editingTicket.date.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error ?? `Save failed (${res.status})`)
+        return
+      }
+      const data: TicketListItem[] = await fetch('/api/tickets/all').then(r => r.json())
+      setTicketItems(data)
+      // Refresh log rows too in case match caused ✓ to appear/disappear
+      fetch('/api/log').then(r => r.json()).then((d: LogRow[]) => setRows(d))
+      setEditingTicket(null)
+    } finally {
+      setSavingTicketEdit(false)
+    }
+  }
+
   async function downloadMonthTickets(monthKey: string) {
     setDownloadingMonth(monthKey)
     try {
@@ -430,6 +475,14 @@ export default function MasterLogPage() {
 
   function clearBulkFinished() {
     setBulkQueue(prev => prev.filter(q => q.status === 'pending' || q.status === 'uploading'))
+  }
+
+  function retryFailed(idx: number) {
+    setBulkQueue(prev => prev.map((q, i) => i === idx ? { ...q, status: 'pending', error: undefined, result: undefined } : q))
+  }
+
+  function retryAllFailed() {
+    setBulkQueue(prev => prev.map(q => q.status === 'failed' ? { ...q, status: 'pending', error: undefined, result: undefined } : q))
   }
 
   async function uploadBulkTickets() {
@@ -1569,13 +1622,25 @@ export default function MasterLogPage() {
                     <p className="text-xs font-medium text-gray-700">
                       Upload queue ({bulkQueue.length} file{bulkQueue.length !== 1 ? 's' : ''})
                     </p>
-                    {!bulkUploading && bulkQueue.some(q => q.status === 'done' || q.status === 'failed') && (
-                      <button
-                        onClick={clearBulkFinished}
-                        className="text-xs text-gray-500 hover:text-gray-800"
-                      >
-                        Clear finished
-                      </button>
+                    {!bulkUploading && (
+                      <div className="flex gap-3">
+                        {bulkQueue.some(q => q.status === 'failed') && (
+                          <button
+                            onClick={retryAllFailed}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Retry all failed
+                          </button>
+                        )}
+                        {bulkQueue.some(q => q.status === 'done' || q.status === 'failed') && (
+                          <button
+                            onClick={clearBulkFinished}
+                            className="text-xs text-gray-500 hover:text-gray-800"
+                          >
+                            Clear finished
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1615,6 +1680,9 @@ export default function MasterLogPage() {
                               {q.status === 'pending' && !bulkUploading && (
                                 <button onClick={() => removeBulkFile(i)} className="text-gray-400 hover:text-red-600" title="Remove">×</button>
                               )}
+                              {q.status === 'failed' && !bulkUploading && (
+                                <button onClick={() => retryFailed(i)} className="text-xs text-blue-600 hover:underline" title="Retry this file">Retry</button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1650,10 +1718,13 @@ export default function MasterLogPage() {
           ) : (() => {
             const ticketMatched = ticketItems.filter(t => t.matchStatus === 'auto_matched' || t.matchStatus === 'manually_confirmed').length
             const ticketUnmatched = ticketItems.filter(t => !t.matchStatus || t.matchStatus === 'unmatched').length
+            const ticketsNeedingReview = ticketItems.filter(ticketNeedsReview).length
+
+            const visibleTickets = showReviewOnly ? ticketItems.filter(ticketNeedsReview) : ticketItems
 
             // Build month groups — pourDate (matched) → ticketDate (extracted) → upload date
             const ticketMonthMap = new Map<string, TicketListItem[]>()
-            for (const item of ticketItems) {
+            for (const item of visibleTickets) {
               const key = getMonthKey(item.pourDate ?? item.ticketDate ?? item.createdAt)
               if (!ticketMonthMap.has(key)) ticketMonthMap.set(key, [])
               ticketMonthMap.get(key)!.push(item)
@@ -1726,11 +1797,30 @@ export default function MasterLogPage() {
                   </div>
                 </div>
 
-                {/* Expand / Collapse all */}
-                <div className="flex gap-3 mb-3 text-sm">
+                {/* Expand / Collapse all + Needs-review filter */}
+                <div className="flex items-center gap-3 mb-3 text-sm">
                   <button onClick={() => setOpenTicketMonths(new Set(allTicketMonthKeys))} className="text-gray-500 hover:text-gray-800">Expand all</button>
                   <span className="text-gray-300">|</span>
                   <button onClick={() => setOpenTicketMonths(new Set())} className="text-gray-500 hover:text-gray-800">Collapse all</button>
+                  {ticketsNeedingReview > 0 && (
+                    <label className="ml-auto inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showReviewOnly}
+                        onChange={e => {
+                          setShowReviewOnly(e.target.checked)
+                          if (e.target.checked) {
+                            // Auto-expand all groups so the user sees the filtered rows
+                            setOpenTicketMonths(new Set(allTicketMonthKeys))
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <span className="text-orange-700 font-medium">
+                        Show only tickets needing review ({ticketsNeedingReview})
+                      </span>
+                    </label>
+                  )}
                 </div>
 
                 {/* Month groups */}
@@ -1785,21 +1875,51 @@ export default function MasterLogPage() {
                                   const isConfirmed = item.matchStatus === 'manually_confirmed'
                                   const isUnmatched = !item.matchStatus || item.matchStatus === 'unmatched'
                                   const isLinking = linkingId === item.id
+                                  const isEditing = editingTicket?.id === item.id
+                                  const needsReview = ticketNeedsReview(item)
 
                                   return (
                                     <>
-                                      <tr key={item.id} className={i % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
+                                      <tr key={item.id} className={
+                                        needsReview ? 'bg-orange-50 hover:bg-orange-100'
+                                        : i % 2 === 0 ? 'bg-white hover:bg-blue-50'
+                                        : 'bg-gray-50 hover:bg-blue-50'
+                                      }>
                                         <td className="px-3 py-1.5 border-b whitespace-nowrap font-mono">
-                                          {item.batchTicketNumber
-                                            ? <a href={`/api/tickets/${item.id}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{item.batchTicketNumber}</a>
-                                            : <span className="text-gray-400 italic">(unreadable)</span>}
+                                          {isEditing ? (
+                                            <input
+                                              type="text"
+                                              value={editingTicket.batch}
+                                              onChange={e => setEditingTicket({ ...editingTicket, batch: e.target.value })}
+                                              placeholder="Ticket #"
+                                              className="border rounded px-2 py-0.5 font-mono text-xs w-28"
+                                              autoFocus
+                                            />
+                                          ) : item.batchTicketNumber ? (
+                                            <a href={`/api/tickets/${item.id}/file`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{item.batchTicketNumber}</a>
+                                          ) : (
+                                            <span className="text-orange-600 italic">(unreadable)</span>
+                                          )}
                                         </td>
                                         <td className="px-3 py-1.5 border-b whitespace-nowrap">
-                                          {item.pourDate
-                                            ? fmtDate(item.pourDate)
-                                            : item.ticketDate
-                                            ? fmtDate(item.ticketDate)
-                                            : <span className="text-gray-400 text-xs">—</span>}
+                                          {isEditing ? (
+                                            <input
+                                              type="date"
+                                              value={editingTicket.date}
+                                              onChange={e => setEditingTicket({ ...editingTicket, date: e.target.value })}
+                                              className="border rounded px-2 py-0.5 text-xs"
+                                            />
+                                          ) : item.ticketDate ? (
+                                            <span className={needsReview && !item.batchTicketNumber ? '' : (() => {
+                                              const y = parseInt(item.ticketDate!.slice(0, 4), 10)
+                                              const now = new Date().getFullYear()
+                                              return (isNaN(y) || y < 2024 || y > now + 1) ? 'text-orange-700 font-medium' : ''
+                                            })()}>{fmtDate(item.ticketDate)}</span>
+                                          ) : item.pourDate ? (
+                                            fmtDate(item.pourDate)
+                                          ) : (
+                                            <span className="text-gray-400 text-xs">—</span>
+                                          )}
                                         </td>
                                         <td className="px-3 py-1.5 border-b max-w-[200px] truncate">
                                           {item.pourLocation ?? item.pourDescription ?? '—'}
@@ -1811,33 +1931,70 @@ export default function MasterLogPage() {
                                         </td>
                                         <td className="px-3 py-1.5 border-b whitespace-nowrap">
                                           <div className="flex items-center gap-2">
-                                            {(isMatched || isConfirmed) && (
-                                              <span className="text-green-600 font-bold text-sm">&#10003;</span>
+                                            {isEditing ? (
+                                              <>
+                                                <button
+                                                  onClick={saveTicketEdit}
+                                                  disabled={savingTicketEdit}
+                                                  className="bg-green-600 hover:bg-green-700 text-white text-xs px-2.5 py-1 rounded disabled:opacity-50 transition-colors"
+                                                >
+                                                  {savingTicketEdit ? 'Saving…' : 'Save'}
+                                                </button>
+                                                <button
+                                                  onClick={() => setEditingTicket(null)}
+                                                  disabled={savingTicketEdit}
+                                                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                                                >
+                                                  Cancel
+                                                </button>
+                                                <a
+                                                  href={`/api/tickets/${item.id}/file`}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="text-xs text-blue-600 hover:underline border border-blue-200 rounded px-2 py-0.5"
+                                                  title="Open the PDF in a new tab"
+                                                >
+                                                  PDF
+                                                </a>
+                                              </>
+                                            ) : (
+                                              <>
+                                                {(isMatched || isConfirmed) && (
+                                                  <span className="text-green-600 font-bold text-sm">&#10003;</span>
+                                                )}
+                                                {isUnmatched && !isLinking && (
+                                                  <button
+                                                    onClick={() => { setLinkingId(item.id); setLinkSearch('') }}
+                                                    className="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2.5 py-1 rounded transition-colors"
+                                                  >
+                                                    Link
+                                                  </button>
+                                                )}
+                                                {isUnmatched && isLinking && (
+                                                  <button
+                                                    onClick={() => setLinkingId(null)}
+                                                    className="text-xs text-gray-500 hover:text-gray-700 underline"
+                                                  >
+                                                    Cancel
+                                                  </button>
+                                                )}
+                                                <button
+                                                  onClick={() => setEditingTicket({ id: item.id, batch: item.batchTicketNumber ?? '', date: item.ticketDate ?? '' })}
+                                                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                                  title="Edit ticket # and date"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  onClick={() => deleteTicket(item.id)}
+                                                  disabled={deletingTicketId === item.id}
+                                                  className="text-xs text-red-500 hover:text-red-700 hover:underline disabled:opacity-40 ml-1"
+                                                  title="Delete this ticket"
+                                                >
+                                                  {deletingTicketId === item.id ? '…' : 'Delete'}
+                                                </button>
+                                              </>
                                             )}
-                                            {isUnmatched && !isLinking && (
-                                              <button
-                                                onClick={() => { setLinkingId(item.id); setLinkSearch('') }}
-                                                className="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2.5 py-1 rounded transition-colors"
-                                              >
-                                                Link
-                                              </button>
-                                            )}
-                                            {isUnmatched && isLinking && (
-                                              <button
-                                                onClick={() => setLinkingId(null)}
-                                                className="text-xs text-gray-500 hover:text-gray-700 underline"
-                                              >
-                                                Cancel
-                                              </button>
-                                            )}
-                                            <button
-                                              onClick={() => deleteTicket(item.id)}
-                                              disabled={deletingTicketId === item.id}
-                                              className="text-xs text-red-500 hover:text-red-700 hover:underline disabled:opacity-40 ml-1"
-                                              title="Delete this ticket"
-                                            >
-                                              {deletingTicketId === item.id ? '…' : 'Delete'}
-                                            </button>
                                           </div>
                                         </td>
                                       </tr>

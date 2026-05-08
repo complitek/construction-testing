@@ -46,6 +46,13 @@ export async function extractTicketData(
   }
 }
 
+// Per-call hard timeout. Anthropic's default is ~10 min/call and the SDK
+// will keep a stuck connection open for the full duration; on a flaky
+// network that means a single bad page can stall the whole upload by
+// 30+ minutes (3 attempts × 10 min). 45s is enough for a normal Haiku
+// PDF call to land while letting failures bail early so retries are cheap.
+const EXTRACT_TIMEOUT_MS = 45_000
+
 export async function extractTicketDataFromPdf(
   pdfBytes: Uint8Array,
   attempts = 3,
@@ -64,7 +71,7 @@ export async function extractTicketDataFromPdf(
             { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
           ],
         }],
-      })
+      }, { timeout: EXTRACT_TIMEOUT_MS })
       const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '{}'
       return parseExtractResponse(raw)
     } catch (e) {
